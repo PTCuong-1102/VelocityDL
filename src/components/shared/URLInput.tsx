@@ -4,6 +4,7 @@ import Input from '../ui/Input';
 import Button from '../ui/Button';
 import Toggle from '../ui/Toggle';
 import { useUIStore } from '../../stores/uiStore';
+import PlatformIcon from './PlatformIcon';
 
 interface URLInputProps {
   onDownload: (url: string, options: DownloadOptions, prefetchedInfo?: any) => void;
@@ -93,21 +94,6 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
   const handleReset = () => {
     resetUrlInput();
     setError(null);
-  };
-
-  const getPlatformIcon = (platform: string) => {
-    switch (platform) {
-      case 'youtube':
-        return 'play_circle';
-      case 'tiktok':
-        return 'music_note';
-      case 'facebook':
-        return 'thumb_up';
-      case 'instagram':
-        return 'photo_camera';
-      default:
-        return 'link';
-    }
   };
 
   const getPlatformName = (platform: string) => {
@@ -326,7 +312,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   className={`badge ${analyzedInfo.platform === 'youtube' ? 'badge-primary' : 'badge-secondary'}`}
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 8px', borderRadius: '4px' }}
                 >
-                  <span className="icon" style={{ fontSize: '12px' }}>{getPlatformIcon(analyzedInfo.platform)}</span>
+                  <PlatformIcon platform={analyzedInfo.platform} size={12} />
                   <span>{getPlatformName(analyzedInfo.platform)}</span>
                 </div>
 

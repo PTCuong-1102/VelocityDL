@@ -3,7 +3,8 @@ import { PlaylistItem } from '../../types/download';
 import { ProgressBar } from './ProgressBar';
 import { StatusDot } from './StatusDot';
 import { formatSpeed } from '../../utils/format';
-import { getPlatformIcon, getPlatformColor } from '../../utils/platform';
+import { getPlatformColor } from '../../utils/platform';
+import PlatformIcon from '../shared/PlatformIcon';
 
 interface PlaylistCardProps {
   item: PlaylistItem;
@@ -192,8 +193,8 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
                   {child.thumbnailUrl ? (
                     <img src={child.thumbnailUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
                   ) : (
-                    <div className="flex-center w-full h-full" style={{ backgroundColor: 'var(--surface-container-high)' }}>
-                      <span className="icon" style={{ fontSize: '10px' }}>{getPlatformIcon(child.platform)}</span>
+                    <div className="flex-center w-full h-full" style={{ backgroundColor: 'var(--surface-container-high)', color: getPlatformColor(child.platform) }}>
+                      <PlatformIcon platform={child.platform} size={12} />
                     </div>
                   )}
                 </div>

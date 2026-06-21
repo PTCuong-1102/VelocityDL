@@ -3,7 +3,8 @@ import { DownloadItem } from '../../types/download';
 import { ProgressBar } from './ProgressBar';
 import { StatusDot } from './StatusDot';
 import { formatBytes, formatSpeed, formatETA } from '../../utils/format';
-import { getPlatformIcon, getPlatformColor } from '../../utils/platform';
+import { getPlatformColor } from '../../utils/platform';
+import PlatformIcon from '../shared/PlatformIcon';
 
 interface DownloadCardProps {
   item: DownloadItem;
@@ -86,9 +87,11 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
               background: `linear-gradient(135deg, var(--surface-container-low) 0%, var(--surface-container-high) 100%)`
             }}
           >
-            <span className="icon" style={{ fontSize: '32px', color: 'var(--on-surface-variant)' }}>
-              {getPlatformIcon(item.platform)}
-            </span>
+            <PlatformIcon 
+              platform={item.platform} 
+              size={32} 
+              color="var(--on-surface-variant)" 
+            />
           </div>
         )}
 
@@ -108,9 +111,11 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
             justifyContent: 'center'
           }}
         >
-          <span className="icon" style={{ fontSize: '12px', color: platformColor }}>
-            {getPlatformIcon(item.platform)}
-          </span>
+          <PlatformIcon 
+            platform={item.platform} 
+            size={12} 
+            color={platformColor} 
+          />
         </div>
 
         {/* Duration Badge Overlay */}

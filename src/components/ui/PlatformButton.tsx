@@ -1,6 +1,7 @@
 import React from 'react';
 import { Platform } from '../../types/download';
-import { getPlatformIcon, getPlatformColor } from '../../utils/platform';
+import { getPlatformColor } from '../../utils/platform';
+import PlatformIcon from '../shared/PlatformIcon';
 
 interface PlatformButtonProps {
   platform: Platform;
@@ -14,7 +15,6 @@ export const PlatformButton: React.FC<PlatformButtonProps> = ({
   onClick
 }) => {
   const color = getPlatformColor(platform);
-  const icon = getPlatformIcon(platform);
 
   return (
     <button
@@ -48,9 +48,7 @@ export const PlatformButton: React.FC<PlatformButtonProps> = ({
         }}
         className="platform-btn-icon-wrapper"
       >
-        <span className="icon" style={{ fontSize: '22px', color: color }}>
-          {icon}
-        </span>
+        <PlatformIcon platform={platform} size={22} color={color} />
       </div>
       <span style={{ fontWeight: 500, fontSize: '13px', color: 'var(--on-surface)' }}>
         {label}

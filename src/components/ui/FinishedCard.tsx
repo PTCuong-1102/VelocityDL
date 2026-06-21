@@ -1,7 +1,8 @@
 import React from 'react';
 import { DownloadItem } from '../../types/download';
 import { formatBytes } from '../../utils/format';
-import { getPlatformIcon, getPlatformColor } from '../../utils/platform';
+import { getPlatformColor } from '../../utils/platform';
+import PlatformIcon from '../shared/PlatformIcon';
 
 interface FinishedCardProps {
   item: DownloadItem;
@@ -56,9 +57,11 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
               background: `linear-gradient(135deg, var(--surface-container-low) 0%, var(--surface-container-high) 100%)`
             }}
           >
-            <span className="icon" style={{ fontSize: '48px', color: 'var(--on-surface-variant)' }}>
-              {getPlatformIcon(item.platform)}
-            </span>
+            <PlatformIcon 
+              platform={item.platform} 
+              size={48} 
+              color="var(--on-surface-variant)" 
+            />
           </div>
         )}
 
@@ -96,9 +99,11 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
             justifyContent: 'center'
           }}
         >
-          <span className="icon" style={{ fontSize: '14px', color: platformColor }}>
-            {getPlatformIcon(item.platform)}
-          </span>
+          <PlatformIcon 
+            platform={item.platform} 
+            size={14} 
+            color={platformColor} 
+          />
         </div>
 
         {/* Duration badge bottom-right */}
