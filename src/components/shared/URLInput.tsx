@@ -14,6 +14,8 @@ export interface DownloadOptions {
   maxHeight: number;
   extractSubs: boolean;
   audioOnly: boolean;
+  audioFormat?: string;
+  audioQuality?: string;
 }
 
 export interface AnalyzedMetadata {
@@ -52,6 +54,8 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
   const [downloadMode, setDownloadMode] = useState<'video' | 'audio'>('video');
   const [selectedHeight, setSelectedHeight] = useState<number>(1080);
   const [extractSubs, setExtractSubs] = useState(false);
+  const [selectedAudioFormat, setSelectedAudioFormat] = useState<string>('mp3');
+  const [selectedAudioQuality, setSelectedAudioQuality] = useState<string>('320k');
 
   const handleAnalyze = async () => {
     const trimmedUrl = url.trim();
@@ -86,7 +90,9 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
     const options: DownloadOptions = {
       maxHeight: downloadMode === 'video' ? selectedHeight : 0,
       audioOnly: downloadMode === 'audio',
-      extractSubs: extractSubs
+      extractSubs: extractSubs,
+      audioFormat: downloadMode === 'audio' ? selectedAudioFormat : undefined,
+      audioQuality: downloadMode === 'audio' ? selectedAudioQuality : undefined
     };
 
     onDownload(url.trim(), options, analyzedInfo);
@@ -481,21 +487,59 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   )}
                 </div>
               ) : (
-                <div 
-                  className="flex-row" 
-                  style={{ 
-                    height: '40px', 
-                    alignItems: 'center', 
-                    backgroundColor: 'rgba(255,255,255,0.03)',
-                    padding: '0 12px',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--outline-variant)',
-                    fontSize: '13px',
-                    color: 'var(--secondary)'
-                  }}
-                >
-                  <span className="icon" style={{ fontSize: '16px', marginRight: '6px' }}>audio_file</span>
-                  Hi-Res MP3 extraction (Best bitrate)
+                <div className="flex-col gap-sm" style={{ width: '100%' }}>
+                  {/* Format selection */}
+                  <div className="flex-col" style={{ gap: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--on-surface-variant)' }}>Format</span>
+                    <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
+                      {['mp3', 'm4a', 'wav', 'flac', 'opus'].map((fmt) => (
+                        <button
+                          key={fmt}
+                          type="button"
+                          className={`btn ${selectedAudioFormat === fmt ? 'btn-primary' : 'btn-ghost'}`}
+                          style={{
+                            minWidth: '55px',
+                            height: '36px',
+                            fontSize: '12px',
+                            textTransform: 'uppercase',
+                            flex: '1 1 auto',
+                            padding: '0 8px'
+                          }}
+                          onClick={() => setSelectedAudioFormat(fmt)}
+                        >
+                          {fmt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Quality/Bitrate selection */}
+                  <div className="flex-col" style={{ gap: '6px' }}>
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--on-surface-variant)' }}>Quality / Bitrate</span>
+                    <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
+                      {[
+                        { value: '320k', label: '320k (Best)' },
+                        { value: '256k', label: '256k (High)' },
+                        { value: '192k', label: '192k (Medium)' },
+                        { value: '128k', label: '128k (Eco)' }
+                      ].map((q) => (
+                        <button
+                          key={q.value}
+                          type="button"
+                          className={`btn ${selectedAudioQuality === q.value ? 'btn-primary' : 'btn-ghost'}`}
+                          style={{
+                            minWidth: '70px',
+                            height: '36px',
+                            fontSize: '12px',
+                            flex: '1 1 auto',
+                            padding: '0 8px'
+                          }}
+                          onClick={() => setSelectedAudioQuality(q.value)}
+                        >
+                          {q.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

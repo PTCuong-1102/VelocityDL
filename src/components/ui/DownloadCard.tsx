@@ -25,6 +25,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
   const isError = item.status === 'error';
   const isQueued = item.status === 'queued';
   const isActive = isDownloading || isMerging;
+  const isAudio = item.mediaType === 'audio';
 
   const platformColor = getPlatformColor(item.platform);
 
@@ -160,10 +161,14 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
         <div className="flex-row" style={{ alignItems: 'center', gap: '8px', fontSize: '12px' }}>
           <StatusDot status={item.status} />
           <span style={{ textTransform: 'capitalize', color: isMerging ? 'var(--warning, #ffb74d)' : 'var(--on-surface-variant)' }}>
-            {isMerging ? 'Merging audio & video...' : isDownloading ? 'downloading' : isPaused ? 'paused' : isQueued ? 'queued' : isError ? 'error' : 'ready'}
+            {isMerging 
+              ? (isAudio ? 'extracting audio...' : 'Merging audio & video...') 
+              : isDownloading ? 'downloading' : isPaused ? 'paused' : isQueued ? 'queued' : isError ? 'error' : 'ready'}
           </span>
           {isMerging && (
-            <span className="icon" style={{ fontSize: '14px', color: 'var(--warning, #ffb74d)', animation: 'pulse 1.5s infinite' }}>merge_type</span>
+            <span className="icon" style={{ fontSize: '14px', color: 'var(--warning, #ffb74d)', animation: 'pulse 1.5s infinite' }}>
+              {isAudio ? 'audio_file' : 'merge_type'}
+            </span>
           )}
           <span className="mono" style={{ fontWeight: 600, color: 'var(--primary)', marginLeft: 'auto' }}>
             {item.progress.toFixed(1)}%
@@ -191,8 +196,12 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
             <span style={{ color: 'var(--error)' }}>Error: {item.error || 'Unknown failure'}</span>
           ) : isMerging ? (
             <span style={{ color: 'var(--warning, #ffb74d)', fontWeight: 500 }}>
-              <span className="icon" style={{ fontSize: '11px', verticalAlign: 'middle', marginRight: '4px' }}>sync</span>
-              FFmpeg is merging video and audio tracks into a single file...
+              <span className="icon" style={{ fontSize: '11px', verticalAlign: 'middle', marginRight: '4px' }}>
+                {isAudio ? 'audio_file' : 'sync'}
+              </span>
+              {isAudio 
+                ? 'FFmpeg is converting audio format to MP3...' 
+                : 'FFmpeg is merging video and audio tracks into a single file...'}
             </span>
           ) : (
             <>

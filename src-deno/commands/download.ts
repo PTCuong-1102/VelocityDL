@@ -4,6 +4,8 @@ export interface DownloadOptions {
   maxHeight: number;
   extractSubs: boolean;
   audioOnly: boolean;
+  audioFormat?: string;
+  audioQuality?: string;
 }
 
 export async function downloadMedia(
@@ -22,7 +24,9 @@ export async function downloadMedia(
 
   // Add formatting / extraction quality options
   if (options.audioOnly) {
-    args.push("-f", "ba", "--extract-audio", "--audio-format", "mp3");
+    const format = options.audioFormat || "mp3";
+    const quality = options.audioQuality || "320k";
+    args.push("-f", "ba/b", "--extract-audio", "--audio-format", format, "--audio-quality", quality);
   } else {
     // Use the selected max height for quality cap
     const height = options.maxHeight > 0 ? options.maxHeight : 1080;

@@ -73,8 +73,8 @@ export function useDownload() {
           totalBytes: 0,
           speed: 0,
           eta: 0,
-          format: options.audioOnly ? 'MP3' : 'MP4',
-          quality: '1080p',
+          format: options.audioOnly ? (options.audioFormat?.toUpperCase() || 'MP3') : 'MP4',
+          quality: options.audioOnly ? (options.audioQuality ? `${options.audioQuality.replace('k', '')}kbps` : '320kbps') : '1080p',
           createdAt: Date.now(),
           outputPath: ''
         })) || []
@@ -92,8 +92,8 @@ export function useDownload() {
         totalBytes: 0,
         speed: 0,
         eta: 0,
-        format: options.audioOnly ? 'MP3' : 'MP4',
-        quality: prefetchedInfo?.quality || (options.audioOnly ? 'Hi-Res' : 'Auto'),
+        format: options.audioOnly ? (options.audioFormat?.toUpperCase() || 'MP3') : 'MP4',
+        quality: options.audioOnly ? (options.audioQuality ? `${options.audioQuality.replace('k', '')}kbps` : '320kbps') : (prefetchedInfo?.quality || 'Auto'),
         thumbnailUrl: prefetchedInfo?.thumbnailUrl,
         duration: prefetchedInfo?.duration,
         createdAt: Date.now(),
@@ -185,10 +185,13 @@ export function useDownload() {
       // Extract height from quality string (e.g. "1920x1080" → 1080, "720p" → 720)
       const qualityMatch = item.quality.match(/(\d+)(?:p|$)/i) || item.quality.match(/x(\d+)/);
       const maxHeight = qualityMatch ? parseInt(qualityMatch[1]) : 1080;
+      const isAudio = item.mediaType === 'audio';
       const options = {
-        maxHeight: item.mediaType === 'audio' ? 0 : maxHeight,
+        maxHeight: isAudio ? 0 : maxHeight,
         extractSubs: false,
-        audioOnly: item.mediaType === 'audio'
+        audioOnly: isAudio,
+        audioFormat: isAudio ? item.format.toLowerCase() : undefined,
+        audioQuality: isAudio ? (item.quality.includes('kbps') ? item.quality.replace('kbps', 'k') : '320k') : undefined
       };
 
       await invoke('start_download', { id, url: item.url, saveDir, options });
