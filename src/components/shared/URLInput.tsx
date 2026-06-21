@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
 import Toggle from '../ui/Toggle';
+import { useUIStore } from '../../stores/uiStore';
 
 interface URLInputProps {
   onDownload: (url: string, options: DownloadOptions, prefetchedInfo?: any) => void;
@@ -34,9 +35,15 @@ export interface AnalyzedMetadata {
 }
 
 export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
-  const [url, setUrl] = useState('');
+  const {
+    urlInputUrl: url,
+    setUrlInputUrl: setUrl,
+    urlInputAnalyzedInfo: analyzedInfo,
+    setUrlInputAnalyzedInfo: setAnalyzedInfo,
+    resetUrlInput
+  } = useUIStore();
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analyzedInfo, setAnalyzedInfo] = useState<AnalyzedMetadata | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Download options state
@@ -84,8 +91,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
   };
 
   const handleReset = () => {
-    setUrl('');
-    setAnalyzedInfo(null);
+    resetUrlInput();
     setError(null);
   };
 
@@ -465,7 +471,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
               style={{ height: '42px', padding: '0 20px' }}
               onClick={handleReset}
             >
-              Analyze Another
+              Reset
             </Button>
             <Button 
               variant="primary" 

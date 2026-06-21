@@ -1,9 +1,10 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useUIStore } from '../../stores/uiStore';
 
 export const SideNav: React.FC = () => {
-  const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { sidebarCollapsed, toggleSidebar, resetUrlInput } = useUIStore();
+  const navigate = useNavigate();
 
   const menuItems = [
     { path: '/', label: 'Dashboard', icon: 'dashboard' },
@@ -67,7 +68,8 @@ export const SideNav: React.FC = () => {
             justifyContent: 'center'
           }}
           onClick={() => {
-            // Future command / trigger modal
+            resetUrlInput();
+            navigate('/');
           }}
         >
           <span className="icon">add</span>
