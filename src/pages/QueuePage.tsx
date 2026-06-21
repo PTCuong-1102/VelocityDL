@@ -21,13 +21,13 @@ export const QueuePage: React.FC = () => {
     return titleMatch || urlMatch;
   });
 
-  const activeCount = queueItems.filter((d) => d.status === 'downloading').length;
+  const activeCount = queueItems.filter((d) => d.status === 'downloading' || d.status === 'merging').length;
   const pausedCount = queueItems.filter((d) => d.status === 'paused').length;
   const queuedCount = queueItems.filter((d) => d.status === 'queued').length;
 
   const handlePauseAll = () => {
     downloads.forEach((d) => {
-      if (d.status === 'downloading' || d.status === 'queued') {
+      if (d.status === 'downloading' || d.status === 'merging' || d.status === 'queued') {
         pauseDownload(d.id);
       }
     });

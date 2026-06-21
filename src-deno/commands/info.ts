@@ -1,5 +1,75 @@
 import { getYtdlpPath } from "../utils/paths.ts";
 
+interface FormatEntry {
+  format_id?: string;
+  ext?: string;
+  width?: number;
+  height?: number;
+  vcodec?: string;
+  acodec?: string;
+  tbr?: number;
+  filesize?: number;
+  format_note?: string;
+}
+
+/**
+ * Extract the best available video resolution from the formats array.
+ * Scans all formats that have a video codec (vcodec != "none") and
+ * returns the one with the highest height (resolution).
+ */
+function extractBestResolution(formats: FormatEntry[]): { width: number; height: number } | null {
+  let bestWidth = 0;
+  let bestHeight = 0;
+
+  for (const fmt of formats) {
+    // Only consider formats that have video (vcodec is not "none" or missing)
+    if (fmt.vcodec && fmt.vcodec !== "none" && fmt.height) {
+      if (fmt.height > bestHeight) {
+        bestHeight = fmt.height;
+        bestWidth = fmt.width || 0;
+      }
+    }
+  }
+
+  if (bestHeight > 0) {
+    return { width: bestWidth, height: bestHeight };
+  }
+  return null;
+}
+
+/**
+ * Build a sorted list of unique available video quality labels from formats.
+ * Example output: ["2160p", "1440p", "1080p", "720p", "480p", "360p"]
+ */
+function extractAvailableQualities(formats: FormatEntry[]): string[] {
+  const heights = new Set<number>();
+
+  for (const fmt of formats) {
+    if (fmt.vcodec && fmt.vcodec !== "none" && fmt.height) {
+      heights.add(fmt.height);
+    }
+  }
+
+  // Sort descending and convert to labels
+  return Array.from(heights)
+    .sort((a, b) => b - a)
+    .map((h) => `${h}p`);
+}
+
+/**
+ * Format resolution into a human-readable quality string.
+ * Examples: "1920x1080", "3840x2160"
+ */
+function formatQuality(width: number, height: number): string {
+  if (width > 0 && height > 0) {
+    return `${width}x${height}`;
+  }
+  if (height > 0) {
+    return `${height}p`;
+  }
+  return "Unknown";
+}
+
 export async function getVideoInfo(url: string): Promise<void> {
   const ytdlpPath = getYtdlpPath();
 
@@ -78,6 +148,25 @@ export async function getVideoInfo(url: string): Promise<void> {
           : `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
       }
 
+      // Extract real resolution from formats array instead of relying on top-level width/height
+      let quality = "Unknown";
+      let availableQualities: string[] = [];
+
+      // First try: use the formats array (most reliable)
+      const formats: FormatEntry[] = rawData.formats || [];
+      if (formats.length > 0) {
+        const bestRes = extractBestResolution(formats);
+        if (bestRes) {
+          quality = formatQuality(bestRes.width, bestRes.height);
+        }
+        availableQualities = extractAvailableQualities(formats);
+      }
+
+      // Fallback: use top-level width/height if formats parsing found nothing
+      if (quality === "Unknown" && rawData.width && rawData.height) {
+        quality = `${rawData.width}x${rawData.height}`;
+      }
+
       payload = {
         type: "info",
         data: {
@@ -88,7 +177,8 @@ export async function getVideoInfo(url: string): Promise<void> {
           durationSeconds: durationSec || 0,
           uploader: rawData.uploader || "Unknown",
           format: rawData.ext || "mp4",
-          quality: rawData.width && rawData.height ? `${rawData.width}x${rawData.height}` : "1080p",
+          quality,
+          availableQualities,
           platform,
         }
       };

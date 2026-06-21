@@ -1,4 +1,4 @@
-export type DownloadStatus = 'queued' | 'downloading' | 'paused' | 'finished' | 'error';
+export type DownloadStatus = 'queued' | 'downloading' | 'merging' | 'paused' | 'finished' | 'error';
 export type Platform = 'youtube' | 'tiktok' | 'facebook' | 'instagram' | 'other';
 export type MediaType = 'video' | 'audio' | 'archive';
 

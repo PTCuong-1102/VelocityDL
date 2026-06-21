@@ -20,9 +20,11 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
   onCancel
 }) => {
   const isDownloading = item.status === 'downloading';
+  const isMerging = item.status === 'merging';
   const isPaused = item.status === 'paused';
   const isError = item.status === 'error';
   const isQueued = item.status === 'queued';
+  const isActive = isDownloading || isMerging;
 
   const platformColor = getPlatformColor(item.platform);
 
@@ -42,7 +44,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
       }}
     >
       {/* Glow Effect when active */}
-      {isDownloading && (
+      {isActive && (
         <div 
           style={{
             position: 'absolute',
@@ -50,7 +52,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
             left: '-50px',
             width: '100px',
             height: '100px',
-            background: `radial-gradient(circle, ${platformColor}33 0%, rgba(0,0,0,0) 70%)`,
+            background: `radial-gradient(circle, ${isMerging ? 'rgba(255, 183, 77, 0.3)' : `${platformColor}33`} 0%, rgba(0,0,0,0) 70%)`,
             pointerEvents: 'none'
           }}
         />
@@ -157,9 +159,12 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
         {/* Status Line */}
         <div className="flex-row" style={{ alignItems: 'center', gap: '8px', fontSize: '12px' }}>
           <StatusDot status={item.status} />
-          <span style={{ textTransform: 'capitalize', color: 'var(--on-surface-variant)' }}>
-            {isDownloading ? 'downloading' : isPaused ? 'paused' : isQueued ? 'queued' : isError ? 'error' : 'ready'}
+          <span style={{ textTransform: 'capitalize', color: isMerging ? 'var(--warning, #ffb74d)' : 'var(--on-surface-variant)' }}>
+            {isMerging ? 'Merging audio & video...' : isDownloading ? 'downloading' : isPaused ? 'paused' : isQueued ? 'queued' : isError ? 'error' : 'ready'}
           </span>
+          {isMerging && (
+            <span className="icon" style={{ fontSize: '14px', color: 'var(--warning, #ffb74d)', animation: 'pulse 1.5s infinite' }}>merge_type</span>
+          )}
           <span className="mono" style={{ fontWeight: 600, color: 'var(--primary)', marginLeft: 'auto' }}>
             {item.progress.toFixed(1)}%
           </span>
@@ -168,9 +173,9 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
         {/* Progress Bar */}
         <ProgressBar 
           percent={item.progress} 
-          variant={isDownloading ? 'primary' : isPaused ? 'muted' : isError ? 'muted' : 'secondary'} 
+          variant={isMerging ? 'secondary' : isDownloading ? 'primary' : isPaused ? 'muted' : isError ? 'muted' : 'secondary'} 
           size="sm"
-          shimmer={isDownloading}
+          shimmer={isDownloading || isMerging}
         />
 
         {/* Technical metrics info */}
@@ -184,6 +189,11 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
         >
           {isError ? (
             <span style={{ color: 'var(--error)' }}>Error: {item.error || 'Unknown failure'}</span>
+          ) : isMerging ? (
+            <span style={{ color: 'var(--warning, #ffb74d)', fontWeight: 500 }}>
+              <span className="icon" style={{ fontSize: '11px', verticalAlign: 'middle', marginRight: '4px' }}>sync</span>
+              FFmpeg is merging video and audio tracks into a single file...
+            </span>
           ) : (
             <>
               {/* Bytes Downloaded / Total */}
@@ -229,7 +239,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
           </button>
         )}
 
-        {onCancel && (isDownloading || isPaused || isQueued) && (
+        {onCancel && (isDownloading || isMerging || isPaused || isQueued) && (
           <button 
             className="btn btn-ghost btn-icon flex-center"
             style={{ width: '32px', height: '32px', color: 'var(--error)' }}

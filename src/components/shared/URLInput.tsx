@@ -11,7 +11,7 @@ interface URLInputProps {
 }
 
 export interface DownloadOptions {
-  auto4k: boolean;
+  maxHeight: number;
   extractSubs: boolean;
   audioOnly: boolean;
 }
@@ -24,6 +24,7 @@ export interface AnalyzedMetadata {
   uploader: string;
   format: string;
   quality: string;
+  availableQualities?: string[];
   platform: 'youtube' | 'tiktok' | 'facebook' | 'instagram' | 'other';
   isPlaylist?: boolean;
   totalItems?: number;
@@ -49,7 +50,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
 
   // Download options state
   const [downloadMode, setDownloadMode] = useState<'video' | 'audio'>('video');
-  const [videoQuality, setVideoQuality] = useState<'4k' | '1080p'>('1080p');
+  const [selectedHeight, setSelectedHeight] = useState<number>(1080);
   const [extractSubs, setExtractSubs] = useState(false);
 
   const handleAnalyze = async () => {
@@ -83,7 +84,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
     if (!analyzedInfo) return;
 
     const options: DownloadOptions = {
-      auto4k: downloadMode === 'video' && videoQuality === '4k',
+      maxHeight: downloadMode === 'video' ? selectedHeight : 0,
       audioOnly: downloadMode === 'audio',
       extractSubs: extractSubs
     };
@@ -335,6 +336,54 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   </div>
                 )}
 
+                {/* Resolution quality badge */}
+                {analyzedInfo.quality && analyzedInfo.quality !== 'Playlist' && (
+                  <div 
+                    className="badge badge-secondary"
+                    style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '4px', 
+                      padding: '4px 8px', 
+                      borderRadius: '4px',
+                      backgroundColor: 'rgba(107, 216, 203, 0.15)',
+                      color: 'var(--secondary)',
+                      borderColor: 'rgba(107, 216, 203, 0.3)'
+                    }}
+                  >
+                    <span className="icon" style={{ fontSize: '12px' }}>high_quality</span>
+                    <span>{analyzedInfo.quality}</span>
+                  </div>
+                )}
+
+                {/* Available qualities badges */}
+                {analyzedInfo.availableQualities && analyzedInfo.availableQualities.length > 0 && (
+                  <div 
+                    style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '4px',
+                      flexWrap: 'wrap'
+                    }}
+                  >
+                    {analyzedInfo.availableQualities.slice(0, 5).map((q: string) => (
+                      <span 
+                        key={q}
+                        style={{
+                          fontSize: '10px',
+                          padding: '2px 6px',
+                          borderRadius: '3px',
+                          backgroundColor: 'rgba(255,255,255,0.05)',
+                          color: 'var(--on-surface-variant)',
+                          border: '1px solid var(--outline-variant)'
+                        }}
+                      >
+                        {q}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {/* Uploader name */}
                 {analyzedInfo.uploader && (
                   <span className="text-muted" style={{ fontSize: '13px' }}>
@@ -385,21 +434,51 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
               </span>
               
               {downloadMode === 'video' ? (
-                <div className="flex-row gap-sm">
-                  <button
-                    className={`btn ${videoQuality === '1080p' ? 'btn-primary' : 'btn-ghost'}`}
-                    style={{ flexGrow: 1, height: '40px', fontSize: '13px' }}
-                    onClick={() => setVideoQuality('1080p')}
-                  >
-                    1080p (Full HD)
-                  </button>
-                  <button
-                    className={`btn ${videoQuality === '4k' ? 'btn-primary' : 'btn-ghost'}`}
-                    style={{ flexGrow: 1, height: '40px', fontSize: '13px' }}
-                    onClick={() => setVideoQuality('4k')}
-                  >
-                    4K (Ultra HD)
-                  </button>
+                <div className="flex-row gap-sm" style={{ flexWrap: 'wrap' }}>
+                  {analyzedInfo?.availableQualities && analyzedInfo.availableQualities.length > 0 ? (
+                    analyzedInfo.availableQualities.map((q: string) => {
+                      const height = parseInt(q);
+                      if (isNaN(height)) return null;
+                      const label = height >= 2160 ? `${q} (4K)` 
+                        : height >= 1440 ? `${q} (2K)` 
+                        : height >= 1080 ? `${q} (FHD)` 
+                        : height >= 720 ? `${q} (HD)` 
+                        : q;
+                      return (
+                        <button
+                          key={q}
+                          className={`btn ${selectedHeight === height ? 'btn-primary' : 'btn-ghost'}`}
+                          style={{ 
+                            minWidth: '80px',
+                            height: '40px', 
+                            fontSize: '13px',
+                            flex: '1 1 auto'
+                          }}
+                          onClick={() => setSelectedHeight(height)}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    /* Fallback when no qualities detected */
+                    <>
+                      <button
+                        className={`btn ${selectedHeight === 1080 ? 'btn-primary' : 'btn-ghost'}`}
+                        style={{ flexGrow: 1, height: '40px', fontSize: '13px' }}
+                        onClick={() => setSelectedHeight(1080)}
+                      >
+                        1080p (FHD)
+                      </button>
+                      <button
+                        className={`btn ${selectedHeight === 2160 ? 'btn-primary' : 'btn-ghost'}`}
+                        style={{ flexGrow: 1, height: '40px', fontSize: '13px' }}
+                        onClick={() => setSelectedHeight(2160)}
+                      >
+                        4K (Ultra HD)
+                      </button>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div 

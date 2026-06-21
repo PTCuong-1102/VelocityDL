@@ -93,7 +93,7 @@ export function useDownload() {
         speed: 0,
         eta: 0,
         format: options.audioOnly ? 'MP3' : 'MP4',
-        quality: prefetchedInfo?.quality || (options.audioOnly ? 'Hi-Res' : '1080p'),
+        quality: prefetchedInfo?.quality || (options.audioOnly ? 'Hi-Res' : 'Auto'),
         thumbnailUrl: prefetchedInfo?.thumbnailUrl,
         duration: prefetchedInfo?.duration,
         createdAt: Date.now(),
@@ -182,8 +182,11 @@ export function useDownload() {
       
       // Re-trigger start_download with same URL and settings
       const saveDir = settings.storage.defaultDownloadPath || '.';
+      // Extract height from quality string (e.g. "1920x1080" → 1080, "720p" → 720)
+      const qualityMatch = item.quality.match(/(\d+)(?:p|$)/i) || item.quality.match(/x(\d+)/);
+      const maxHeight = qualityMatch ? parseInt(qualityMatch[1]) : 1080;
       const options = {
-        auto4k: item.quality.includes('2160') || item.quality.includes('4K'),
+        maxHeight: item.mediaType === 'audio' ? 0 : maxHeight,
         extractSubs: false,
         audioOnly: item.mediaType === 'audio'
       };

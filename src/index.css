@@ -330,6 +330,11 @@ code, .mono {
   animation: pulse 2s infinite ease-in-out;
 }
 
+.status-dot.merging {
+  background-color: #ffb74d;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
 .status-dot.paused {
   background-color: var(--tertiary);
 }

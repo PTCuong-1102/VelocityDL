@@ -1,4 +1,4 @@
-import { getYtdlpPath, getBinDir } from "../utils/paths.ts";
+import { getYtdlpPath, getBinDir, getFfmpegPath, getFfprobePath, getFfmpegDir } from "../utils/paths.ts";
 
 export async function ensureYtdlpInstalled(forceUpdate = false): Promise<string> {
   const ytdlpPath = getYtdlpPath();
@@ -129,6 +129,246 @@ async function verifyChecksum(binaryPath: string, isWindows: boolean): Promise<v
     status: "info",
     message: `Checksum verified OK for ${expectedFilename}.`
   }));
+}
+
+/**
+ * Ensure FFmpeg and FFprobe binaries are installed.
+ * Downloads static builds from BtbN/FFmpeg-Builds on GitHub.
+ * On Windows: downloads zip, extracts ffmpeg.exe + ffprobe.exe
+ * On Linux/macOS: downloads tar.xz, extracts ffmpeg + ffprobe
+ */
+export async function ensureFfmpegInstalled(forceUpdate = false): Promise<string> {
+  const ffmpegPath = getFfmpegPath();
+  const ffprobePath = getFfprobePath();
+  const ffmpegDir = getFfmpegDir();
+
+  // Check if both binaries exist
+  let ffmpegExists = false;
+  let ffprobeExists = false;
+  try {
+    const stat = await Deno.stat(ffmpegPath);
+    ffmpegExists = stat.isFile;
+  } catch (_) { ffmpegExists = false; }
+  try {
+    const stat = await Deno.stat(ffprobePath);
+    ffprobeExists = stat.isFile;
+  } catch (_) { ffprobeExists = false; }
+
+  if (ffmpegExists && ffprobeExists && !forceUpdate) {
+    return ffmpegDir;
+  }
+
+  console.log(JSON.stringify({
+    status: "updating",
+    message: "Downloading FFmpeg binaries (first-time setup, ~80MB)..."
+  }));
+
+  // Create ffmpeg directory
+  await Deno.mkdir(ffmpegDir, { recursive: true });
+
+  const isWindows = Deno.build.os === "windows";
+
+  try {
+    if (isWindows) {
+      await downloadFfmpegWindows(ffmpegDir);
+    } else {
+      await downloadFfmpegUnix(ffmpegDir);
+    }
+
+    // Verify the binaries exist after extraction
+    const ffmpegStat = await Deno.stat(ffmpegPath);
+    const ffprobeStat = await Deno.stat(ffprobePath);
+
+    if (!ffmpegStat.isFile || !ffprobeStat.isFile) {
+      throw new Error("FFmpeg extraction failed: binaries not found after extraction.");
+    }
+
+    console.log(JSON.stringify({
+      status: "ready",
+      message: "FFmpeg installed successfully."
+    }));
+
+    return ffmpegDir;
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.log(JSON.stringify({
+      status: "error",
+      message: `Failed to install FFmpeg: ${errorMsg}`
+    }));
+    throw err;
+  }
+}
+
+/**
+ * Download FFmpeg for Windows using BtbN builds.
+ * Downloads zip, extracts ffmpeg.exe and ffprobe.exe into target dir.
+ */
+async function downloadFfmpegWindows(targetDir: string): Promise<void> {
+  const downloadUrl = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
+  
+  const tempZip = await Deno.makeTempFile({ suffix: ".zip" });
+
+  try {
+    // Download the zip file
+    console.log(JSON.stringify({
+      status: "updating",
+      message: "Downloading FFmpeg archive..."
+    }));
+
+    const response = await fetch(downloadUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download FFmpeg: ${response.statusText}`);
+    }
+
+    const file = await Deno.open(tempZip, { write: true, create: true, truncate: true });
+    await response.body?.pipeTo(file.writable);
+
+    // Use PowerShell to extract specific files from the zip
+    console.log(JSON.stringify({
+      status: "updating",
+      message: "Extracting FFmpeg binaries..."
+    }));
+
+    // Extract zip to a temp directory first
+    const tempExtractDir = await Deno.makeTempDir();
+
+    const extractCmd = new Deno.Command("powershell", {
+      args: [
+        "-NoProfile", "-NonInteractive", "-Command",
+        `Expand-Archive -Path '${tempZip}' -DestinationPath '${tempExtractDir}' -Force`
+      ],
+      stdout: "piped",
+      stderr: "piped"
+    });
+
+    const extractResult = await extractCmd.output();
+    if (!extractResult.success) {
+      const errStr = new TextDecoder().decode(extractResult.stderr);
+      throw new Error(`Failed to extract zip: ${errStr}`);
+    }
+
+    // Find ffmpeg.exe and ffprobe.exe recursively in extracted dir
+    const ffmpegBin = await findFileRecursive(tempExtractDir, "ffmpeg.exe");
+    const ffprobeBin = await findFileRecursive(tempExtractDir, "ffprobe.exe");
+
+    if (!ffmpegBin || !ffprobeBin) {
+      throw new Error("Could not find ffmpeg.exe or ffprobe.exe in the downloaded archive.");
+    }
+
+    // Copy binaries to target directory
+    await Deno.copyFile(ffmpegBin, `${targetDir}\\ffmpeg.exe`);
+    await Deno.copyFile(ffprobeBin, `${targetDir}\\ffprobe.exe`);
+
+    // Clean up temp files
+    try { await Deno.remove(tempZip); } catch (_) { /* ignore */ }
+    try { await Deno.remove(tempExtractDir, { recursive: true }); } catch (_) { /* ignore */ }
+
+  } catch (err) {
+    // Clean up temp zip on error
+    try { await Deno.remove(tempZip); } catch (_) { /* ignore */ }
+    throw err;
+  }
+}
+
+/**
+ * Download FFmpeg for Linux/macOS using BtbN builds.
+ * Downloads tar.xz, extracts ffmpeg and ffprobe into target dir.
+ */
+async function downloadFfmpegUnix(targetDir: string): Promise<void> {
+  const isMac = Deno.build.os === "darwin";
+  // BtbN only provides Linux builds; for macOS we use a different strategy
+  const downloadUrl = isMac
+    ? "https://evermeet.cx/ffmpeg/getrelease/zip"
+    : "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz";
+
+  const tempFile = await Deno.makeTempFile({ suffix: isMac ? ".zip" : ".tar.xz" });
+
+  try {
+    console.log(JSON.stringify({
+      status: "updating",
+      message: "Downloading FFmpeg archive..."
+    }));
+
+    const response = await fetch(downloadUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download FFmpeg: ${response.statusText}`);
+    }
+
+    const file = await Deno.open(tempFile, { write: true, create: true, truncate: true });
+    await response.body?.pipeTo(file.writable);
+
+    console.log(JSON.stringify({
+      status: "updating",
+      message: "Extracting FFmpeg binaries..."
+    }));
+
+    const tempExtractDir = await Deno.makeTempDir();
+
+    if (isMac) {
+      // Extract zip on macOS
+      const cmd = new Deno.Command("unzip", {
+        args: ["-o", tempFile, "-d", tempExtractDir],
+        stdout: "piped",
+        stderr: "piped"
+      });
+      const result = await cmd.output();
+      if (!result.success) {
+        throw new Error("Failed to extract FFmpeg zip on macOS.");
+      }
+    } else {
+      // Extract tar.xz on Linux
+      const cmd = new Deno.Command("tar", {
+        args: ["-xf", tempFile, "-C", tempExtractDir],
+        stdout: "piped",
+        stderr: "piped"
+      });
+      const result = await cmd.output();
+      if (!result.success) {
+        throw new Error("Failed to extract FFmpeg tar.xz on Linux.");
+      }
+    }
+
+    // Find and copy binaries
+    const ffmpegBin = await findFileRecursive(tempExtractDir, "ffmpeg");
+    const ffprobeBin = await findFileRecursive(tempExtractDir, "ffprobe");
+
+    if (!ffmpegBin) {
+      throw new Error("Could not find ffmpeg binary in the downloaded archive.");
+    }
+
+    await Deno.copyFile(ffmpegBin, `${targetDir}/ffmpeg`);
+    await Deno.chmod(`${targetDir}/ffmpeg`, 0o755);
+
+    if (ffprobeBin) {
+      await Deno.copyFile(ffprobeBin, `${targetDir}/ffprobe`);
+      await Deno.chmod(`${targetDir}/ffprobe`, 0o755);
+    }
+
+    // Clean up
+    try { await Deno.remove(tempFile); } catch (_) { /* ignore */ }
+    try { await Deno.remove(tempExtractDir, { recursive: true }); } catch (_) { /* ignore */ }
+
+  } catch (err) {
+    try { await Deno.remove(tempFile); } catch (_) { /* ignore */ }
+    throw err;
+  }
+}
+
+/**
+ * Recursively search for a file by name within a directory.
+ */
+async function findFileRecursive(dir: string, filename: string): Promise<string | null> {
+  for await (const entry of Deno.readDir(dir)) {
+    const fullPath = `${dir}/${entry.name}`;
+    if (entry.isFile && entry.name === filename) {
+      return fullPath;
+    }
+    if (entry.isDirectory) {
+      const found = await findFileRecursive(fullPath, filename);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 export default ensureYtdlpInstalled;

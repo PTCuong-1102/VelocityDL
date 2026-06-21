@@ -19,3 +19,21 @@ export function getYtdlpPath(): string {
   const binaryName = isWindows ? "yt-dlp.exe" : "yt-dlp";
   return path.join(binDir, binaryName);
 }
+
+export function getFfmpegDir(): string {
+  return path.join(getBinDir(), "ffmpeg");
+}
+
+export function getFfmpegPath(): string {
+  const ffmpegDir = getFfmpegDir();
+  const isWindows = Deno.build.os === "windows";
+  const binaryName = isWindows ? "ffmpeg.exe" : "ffmpeg";
+  return path.join(ffmpegDir, binaryName);
+}
+
+export function getFfprobePath(): string {
+  const ffmpegDir = getFfmpegDir();
+  const isWindows = Deno.build.os === "windows";
+  const binaryName = isWindows ? "ffprobe.exe" : "ffprobe";
+  return path.join(ffmpegDir, binaryName);
+}

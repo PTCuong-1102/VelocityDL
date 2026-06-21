@@ -1,7 +1,7 @@
-import { getYtdlpPath } from "../utils/paths.ts";
+import { getYtdlpPath, getFfmpegDir } from "../utils/paths.ts";
 
 export interface DownloadOptions {
-  auto4k: boolean;
+  maxHeight: number;
   extractSubs: boolean;
   audioOnly: boolean;
 }
@@ -13,17 +13,22 @@ export async function downloadMedia(
   options: DownloadOptions
 ): Promise<void> {
   const ytdlpPath = getYtdlpPath();
+  const ffmpegDir = getFfmpegDir();
 
   const args: string[] = [];
+
+  // Point yt-dlp to our bundled FFmpeg so it can merge video+audio automatically
+  args.push("--ffmpeg-location", ffmpegDir);
 
   // Add formatting / extraction quality options
   if (options.audioOnly) {
     args.push("-f", "ba", "--extract-audio", "--audio-format", "mp3");
-  } else if (options.auto4k) {
-    args.push("-f", "bv*[height<=2160]+ba/b[height<=2160]");
   } else {
-    // Default to best quality up to 1080p
-    args.push("-f", "bv*[height<=1080]+ba/b[height<=1080]");
+    // Use the selected max height for quality cap
+    const height = options.maxHeight > 0 ? options.maxHeight : 1080;
+    args.push("-f", `bv*[height<=${height}]+ba/b[height<=${height}]`);
+    // Ensure merged output is always a single mp4 file
+    args.push("--merge-output-format", "mp4");
   }
 
   // Subtitles
@@ -39,6 +44,12 @@ export async function downloadMedia(
   args.push(
     "--progress-template", 
     "downloading:%(progress.downloaded_bytes)s:%(progress.total_bytes)s:%(progress.speed)s:%(progress.eta)s:%(info.playlist_index)s:%(info.n_entries)s"
+  );
+
+  // Post-processor progress template — emit 'merging' status when FFmpeg is muxing
+  args.push(
+    "--progress-template",
+    "postprocess:merging:%(info.playlist_index)s:%(info.n_entries)s"
   );
 
   // Add target URL
@@ -70,6 +81,28 @@ export async function downloadMedia(
 
       for (const line of lines) {
         const trimmed = line.trim();
+
+        // Handle merge/postprocess status
+        if (trimmed.startsWith("postprocess:merging:")) {
+          const parts = trimmed.split(":");
+          const playlistIndex = parts[2] && parts[2] !== "NA" ? parseInt(parts[2]) : null;
+          const playlistTotal = parts[3] && parts[3] !== "NA" ? parseInt(parts[3]) : null;
+
+          console.log(JSON.stringify({
+            id,
+            progress: 99,
+            downloadedBytes: 0,
+            totalBytes: 0,
+            speed: 0,
+            eta: 0,
+            status: "merging",
+            playlistIndex,
+            playlistTotal
+          }));
+          continue;
+        }
+
+        // Handle download progress
         if (trimmed.startsWith("downloading:")) {
           const parts = trimmed.split(":");
           if (parts.length >= 5) {
