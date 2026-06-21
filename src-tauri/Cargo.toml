@@ -1,6 +1,6 @@
 [package]
 name = "velocity-dl"
-version = "0.1.2"
+version = "0.1.5"
 description = "VelocityDL - A fast downloader app"
 authors = ["you"]
 edition = "2021"
