@@ -27,7 +27,7 @@ export interface AnalyzedMetadata {
   format: string;
   quality: string;
   availableQualities?: string[];
-  platform: 'youtube' | 'tiktok' | 'facebook' | 'instagram' | 'other';
+  platform: 'youtube' | 'tiktok' | 'facebook' | 'instagram' | 'spotify' | 'other';
   isPlaylist?: boolean;
   totalItems?: number;
   entries?: Array<{
@@ -75,7 +75,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
       
       setAnalyzedInfo(info);
       // Auto-detect playlist or initial mode
-      setDownloadMode(info.platform === 'other' ? 'video' : 'video');
+      setDownloadMode(info.platform === 'spotify' ? 'audio' : 'video');
     } catch (err) {
       console.error(err);
       setError(String(err).replace('Error: ', ''));

@@ -1,4 +1,4 @@
-import { getYtdlpPath, getFfmpegDir } from "../utils/paths.ts";
+import { getYtdlpPath, getFfmpegDir, getSpotdlPath, getFfmpegPath } from "../utils/paths.ts";
 
 export interface DownloadOptions {
   maxHeight: number;
@@ -14,6 +14,104 @@ export async function downloadMedia(
   saveDir: string,
   options: DownloadOptions
 ): Promise<void> {
+  const isSpotify = url.toLowerCase().includes("spotify.com") || url.toLowerCase().includes("open.spotify.com");
+
+  if (isSpotify) {
+    const spotdlPath = getSpotdlPath();
+    const ffmpegPath = getFfmpegPath();
+
+    const args: string[] = ["download", url];
+    args.push("--ffmpeg", ffmpegPath);
+    args.push("--output", `${saveDir}/{artists} - {title}.{output-ext}`);
+
+    const format = options.audioFormat || "mp3";
+    args.push("--format", format);
+
+    if (options.audioQuality) {
+      args.push("--bitrate", options.audioQuality);
+    }
+
+    try {
+      const command = new Deno.Command(spotdlPath, {
+        args,
+        stdout: "piped",
+        stderr: "piped",
+      });
+
+      const child = command.spawn();
+
+      const decoder = new TextDecoder();
+      const stdoutReader = child.stdout.getReader();
+      
+      let buffer = "";
+      let playlistIndex = 1;
+      let playlistTotal = null;
+
+      while (true) {
+        const { value, done } = await stdoutReader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split(/[\r\n]+/);
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+
+          const totalMatch = trimmed.match(/Total\s+(\d+)\/(\d+)\s+complete/i);
+          if (totalMatch) {
+            const completed = parseInt(totalMatch[1]);
+            const total = parseInt(totalMatch[2]);
+            playlistIndex = completed + 1;
+            playlistTotal = total;
+          }
+
+          const percentMatch = trimmed.match(/(\d+)%/);
+          if (percentMatch) {
+            const progress = parseInt(percentMatch[1]);
+
+            console.log(JSON.stringify({
+              id,
+              progress,
+              downloadedBytes: 0,
+              totalBytes: 0,
+              speed: 0,
+              eta: 0,
+              status: "downloading",
+              playlistIndex,
+              playlistTotal
+            }));
+          }
+        }
+      }
+
+      const status = await child.status;
+
+      if (status.success) {
+        console.log(JSON.stringify({
+          id,
+          progress: 100,
+          status: "finished"
+        }));
+      } else {
+        const errorBytes = await child.stderr.getReader().read();
+        const errorStr = errorBytes.value ? decoder.decode(errorBytes.value) : "Unknown error during download";
+        throw new Error(errorStr);
+      }
+
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.log(JSON.stringify({
+        id,
+        status: "error",
+        error: errorMsg,
+        progress: 0
+      }));
+    }
+    return;
+  }
+
   const ytdlpPath = getYtdlpPath();
   const ffmpegDir = getFfmpegDir();
 

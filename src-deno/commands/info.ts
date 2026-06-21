@@ -1,4 +1,4 @@
-import { getYtdlpPath } from "../utils/paths.ts";
+import { getYtdlpPath, getSpotdlPath } from "../utils/paths.ts";
 
 interface FormatEntry {
   format_id?: string;
@@ -71,6 +71,105 @@ function formatQuality(width: number, height: number): string {
 }
 
 export async function getVideoInfo(url: string): Promise<void> {
+  const isSpotify = url.toLowerCase().includes("spotify.com") || url.toLowerCase().includes("open.spotify.com");
+
+  if (isSpotify) {
+    try {
+      const spotdlPath = getSpotdlPath();
+      const tempFile = await Deno.makeTempFile({ suffix: ".spotdl" });
+
+      const command = new Deno.Command(spotdlPath, {
+        args: ["save", url, "--save-file", tempFile],
+        stdout: "piped",
+        stderr: "piped",
+      });
+
+      const output = await command.output();
+      if (!output.success) {
+        const errorStr = new TextDecoder().decode(output.stderr);
+        throw new Error(errorStr || "Failed to extract Spotify metadata");
+      }
+
+      const contentStr = await Deno.readTextFile(tempFile);
+      const rawData = JSON.parse(contentStr);
+
+      try {
+        await Deno.remove(tempFile);
+      } catch (_) { /* ignore */ }
+
+      const songs = rawData.songs || [];
+      if (songs.length === 0) {
+        throw new Error("No tracks found in the Spotify URL");
+      }
+
+      if (songs.length === 1) {
+        const song = songs[0];
+        const durationSec = song.duration;
+        let durationStr = "";
+        if (durationSec) {
+          const m = Math.floor(durationSec / 60);
+          const s = Math.floor(durationSec % 60);
+          durationStr = `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+        }
+
+        const payload = {
+          type: "info",
+          data: {
+            isPlaylist: false,
+            title: `${song.name} - ${song.artists.join(", ")}`,
+            thumbnailUrl: song.cover_url || "",
+            duration: durationStr,
+            durationSeconds: durationSec || 0,
+            uploader: song.album_name || "Unknown Album",
+            format: "mp3",
+            quality: "320kbps",
+            availableQualities: ["320k", "256k", "192k", "128k"],
+            platform: "spotify"
+          }
+        };
+
+        console.log(JSON.stringify(payload));
+      } else {
+        const payload = {
+          type: "info",
+          data: {
+            isPlaylist: true,
+            title: "Spotify Playlist / Album",
+            thumbnailUrl: songs[0]?.cover_url || "",
+            duration: `${songs.length} tracks`,
+            totalItems: songs.length,
+            uploader: "Spotify",
+            format: "playlist",
+            quality: "Playlist",
+            platform: "spotify",
+            entries: songs.map((song: any) => {
+              const durationSec = song.duration;
+              const m = Math.floor(durationSec / 60);
+              const s = Math.floor(durationSec % 60);
+              const durationStr = `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+              return {
+                title: `${song.name} - ${song.artists.join(", ")}`,
+                id: song.song_id || Math.random().toString(36).substring(7),
+                duration: durationStr,
+                url: song.download_url || `https://open.spotify.com/track/${song.song_id}`
+              };
+            })
+          }
+        };
+
+        console.log(JSON.stringify(payload));
+      }
+      return;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      console.log(JSON.stringify({
+        status: "error",
+        message: `Failed to extract Spotify metadata: ${errorMsg}`
+      }));
+      return;
+    }
+  }
+
   const ytdlpPath = getYtdlpPath();
 
   try {

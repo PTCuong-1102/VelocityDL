@@ -1,4 +1,4 @@
-import { ensureYtdlpInstalled, ensureFfmpegInstalled } from "./commands/update.ts";
+import { ensureYtdlpInstalled, ensureFfmpegInstalled, ensureSpotdlInstalled } from "./commands/update.ts";
 import { getVideoInfo } from "./commands/info.ts";
 import { downloadMedia, DownloadOptions } from "./commands/download.ts";
 
@@ -14,10 +14,11 @@ async function main() {
   }
 
   try {
-    // 1. For all commands except update, ensure yt-dlp and FFmpeg are installed
+    // 1. For all commands except update, ensure yt-dlp, FFmpeg and spotDL are installed
     if (command !== "update") {
       await ensureYtdlpInstalled();
       await ensureFfmpegInstalled();
+      await ensureSpotdlInstalled();
     }
 
     // 2. Command Router
@@ -47,9 +48,10 @@ async function main() {
       }
 
       case "update": {
-        // Trigger manual/forced update of yt-dlp and FFmpeg
+        // Trigger manual/forced update of yt-dlp, FFmpeg and spotDL
         await ensureYtdlpInstalled(true);
         await ensureFfmpegInstalled(true);
+        await ensureSpotdlInstalled(true);
         break;
       }
 

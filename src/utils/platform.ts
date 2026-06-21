@@ -10,6 +10,8 @@ export const getPlatformFromUrl = (url: string): Platform => {
     return 'facebook';
   } else if (lowercaseUrl.includes('instagram.com')) {
     return 'instagram';
+  } else if (lowercaseUrl.includes('spotify.com')) {
+    return 'spotify';
   }
   return 'other';
 };
@@ -24,6 +26,8 @@ export const getPlatformIcon = (platform: Platform): string => {
       return 'facebook';
     case 'instagram':
       return 'photo_camera';
+    case 'spotify':
+      return 'music_note';
     default:
       return 'link';
   }
@@ -39,6 +43,8 @@ export const getPlatformColor = (platform: Platform): string => {
       return '#1877f2';
     case 'instagram':
       return '#e1306c';
+    case 'spotify':
+      return '#1db954';
     default:
       return 'var(--primary)';
   }

@@ -1,4 +1,4 @@
-import { getYtdlpPath, getBinDir, getFfmpegPath, getFfprobePath, getFfmpegDir } from "../utils/paths.ts";
+import { getYtdlpPath, getBinDir, getFfmpegPath, getFfprobePath, getFfmpegDir, getSpotdlPath } from "../utils/paths.ts";
 
 export async function ensureYtdlpInstalled(forceUpdate = false): Promise<string> {
   const ytdlpPath = getYtdlpPath();
@@ -369,6 +369,102 @@ async function findFileRecursive(dir: string, filename: string): Promise<string 
     }
   }
   return null;
+}
+
+export async function ensureSpotdlInstalled(forceUpdate = false): Promise<string> {
+  const spotdlPath = getSpotdlPath();
+  const binDir = getBinDir();
+
+  // Check if binary exists
+  let exists = false;
+  try {
+    const stat = await Deno.stat(spotdlPath);
+    exists = stat.isFile;
+  } catch (_err) {
+    exists = false;
+  }
+
+  if (exists && !forceUpdate) {
+    return spotdlPath;
+  }
+
+  console.log(JSON.stringify({ 
+    status: "updating", 
+    message: exists ? "Checking for spotDL update..." : "Downloading spotDL binary..." 
+  }));
+
+  // Create bin folder if missing (recursive, no-op if already exists)
+  await Deno.mkdir(binDir, { recursive: true });
+
+  const isWindows = Deno.build.os === "windows";
+  const isMac = Deno.build.os === "darwin";
+
+  let url = "";
+  try {
+    const response = await fetch("https://api.github.com/repos/spotDL/spotify-downloader/releases/latest");
+    if (response.ok) {
+      const releaseData = await response.json();
+      const assets = releaseData.assets || [];
+      let matchedAsset;
+      if (isWindows) {
+        matchedAsset = assets.find((a: any) => a.name.startsWith("spotdl-") && a.name.endsWith("-win32.exe"));
+      } else if (isMac) {
+        matchedAsset = assets.find((a: any) => a.name.startsWith("spotdl-") && a.name.endsWith("-darwin"));
+      } else {
+        matchedAsset = assets.find((a: any) => a.name.startsWith("spotdl-") && a.name.endsWith("-linux"));
+      }
+      if (matchedAsset && matchedAsset.browser_download_url) {
+        url = matchedAsset.browser_download_url;
+      }
+    }
+  } catch (err) {
+    console.error(JSON.stringify({
+      status: "warning",
+      message: `Failed to fetch latest spotDL release info: ${err instanceof Error ? err.message : String(err)}. Using fallback version 4.5.0.`
+    }));
+  }
+
+  if (!url) {
+    const fallbackVersion = "4.5.0";
+    if (isWindows) {
+      url = `https://github.com/spotDL/spotify-downloader/releases/download/v${fallbackVersion}/spotdl-${fallbackVersion}-win32.exe`;
+    } else if (isMac) {
+      url = `https://github.com/spotDL/spotify-downloader/releases/download/v${fallbackVersion}/spotdl-${fallbackVersion}-darwin`;
+    } else {
+      url = `https://github.com/spotDL/spotify-downloader/releases/download/v${fallbackVersion}/spotdl-${fallbackVersion}-linux`;
+    }
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch: ${response.statusText}`);
+    }
+
+    const file = await Deno.open(spotdlPath, { write: true, create: true, truncate: true });
+    await response.body?.pipeTo(file.writable);
+
+    if (!isWindows) {
+      await Deno.chmod(spotdlPath, 0o755); // Make it executable on macOS/Linux
+    }
+
+    console.log(JSON.stringify({ 
+      status: "ready", 
+      message: exists ? "spotDL updated successfully" : "spotDL installed successfully" 
+    }));
+    
+    return spotdlPath;
+  } catch (err) {
+    // Clean up a possibly corrupt binary
+    try { await Deno.remove(spotdlPath); } catch (_) { /* ignore */ }
+
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.log(JSON.stringify({ 
+      status: "error", 
+      message: `Failed to install spotDL: ${errorMsg}` 
+    }));
+    throw err;
+  }
 }
 
 export default ensureYtdlpInstalled;

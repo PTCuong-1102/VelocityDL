@@ -73,6 +73,7 @@ export const DashboardPage: React.FC = () => {
           }}
         >
           <PlatformButton platform="youtube" label="YouTube" onClick={handlePlatformClick} />
+          <PlatformButton platform="spotify" label="Spotify" onClick={handlePlatformClick} />
           <PlatformButton platform="tiktok" label="TikTok" onClick={handlePlatformClick} />
           <PlatformButton platform="facebook" label="Facebook" onClick={handlePlatformClick} />
           <PlatformButton platform="instagram" label="Instagram" onClick={handlePlatformClick} />

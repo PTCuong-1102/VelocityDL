@@ -37,3 +37,10 @@ export function getFfprobePath(): string {
   const binaryName = isWindows ? "ffprobe.exe" : "ffprobe";
   return path.join(ffmpegDir, binaryName);
 }
+
+export function getSpotdlPath(): string {
+  const binDir = getBinDir();
+  const isWindows = Deno.build.os === "windows";
+  const binaryName = isWindows ? "spotdl.exe" : "spotdl";
+  return path.join(binDir, binaryName);
+}
