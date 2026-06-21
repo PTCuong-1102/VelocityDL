@@ -19,8 +19,8 @@ export const DashboardPage: React.FC = () => {
     .filter((d) => d.status !== 'finished')
     .slice(0, 3);
 
-  const handleDownload = (url: string, options: DownloadOptions) => {
-    startDownload(url, options);
+  const handleDownload = (url: string, options: DownloadOptions, prefetchedInfo?: any) => {
+    startDownload(url, options, prefetchedInfo);
     // Redirect to Queue page to watch progress
     navigate('/queue');
   };

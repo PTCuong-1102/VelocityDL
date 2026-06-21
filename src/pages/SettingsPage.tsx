@@ -231,19 +231,7 @@ export const SettingsPage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
 
-              {/* Desktop notifications toggle */}
-              <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="flex-col" style={{ gap: '4px' }}>
-                  <span style={{ fontWeight: 500, fontSize: '13px' }}>System Notifications</span>
-                  <span className="text-muted" style={{ fontSize: '10px' }}>Alert when downloads finish.</span>
-                </div>
-                <Toggle 
-                  checked={settings.general.desktopNotifications}
-                  onChange={(e) => updateSetting('general', 'desktopNotifications', e.target.checked)}
-                />
-              </div>
             </div>
           </GlassPanel>
         </div>

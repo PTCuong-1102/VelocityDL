@@ -116,31 +116,7 @@ export const SideNav: React.FC = () => {
         ))}
       </nav>
 
-      {/* Footer / User Profile Area */}
-      <div 
-        className="flex-col" 
-        style={{
-          borderTop: '1px solid var(--outline-variant)',
-          padding: '16px',
-          backgroundColor: 'var(--surface-container-lowest)'
-        }}
-      >
-        <div 
-          className="flex-row gap-sm" 
-          style={{ 
-            alignItems: 'center',
-            justifyContent: sidebarCollapsed ? 'center' : 'flex-start'
-          }}
-        >
-          <span className="icon text-muted" style={{ fontSize: '24px' }}>account_circle</span>
-          {!sidebarCollapsed && (
-            <div className="flex-col" style={{ flexGrow: 1 }}>
-              <span style={{ fontWeight: 500, fontSize: '13px' }}>Guest User</span>
-              <span style={{ fontSize: '11px', color: 'var(--on-surface-variant)' }}>Free Tier</span>
-            </div>
-          )}
-        </div>
-      </div>
+
     </div>
   );
 };

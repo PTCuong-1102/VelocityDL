@@ -34,16 +34,16 @@ export function useDownload() {
     }
   });
 
-  const startDownload = async (url: string, options: DownloadOptions) => {
+  const startDownload = async (url: string, options: DownloadOptions, prefetchedInfo?: any) => {
     const id = Math.random().toString(36).substring(2, 9);
     
     // Add default queued item in UI
     addDownload({
       id,
       url,
-      title: 'Analyzing video URL...',
+      title: prefetchedInfo?.title || 'Analyzing video URL...',
       status: 'queued',
-      platform: 'other',
+      platform: prefetchedInfo?.platform || 'other',
       mediaType: options.audioOnly ? 'audio' : 'video',
       progress: 0,
       downloadedBytes: 0,
@@ -51,10 +51,33 @@ export function useDownload() {
       speed: 0,
       eta: 0,
       format: options.audioOnly ? 'MP3' : 'MP4',
-      quality: '1080p',
+      quality: prefetchedInfo?.quality || (options.audioOnly ? 'Hi-Res' : '1080p'),
+      thumbnailUrl: prefetchedInfo?.thumbnailUrl,
+      duration: prefetchedInfo?.duration,
       createdAt: Date.now(),
       outputPath: ''
     });
+
+    if (prefetchedInfo) {
+      addToast('info', `Starting download: ${prefetchedInfo.title || url}`);
+      try {
+        const saveDir = settings.storage.defaultDownloadPath || '.';
+        await invoke('start_download', { id, url, saveDir, options });
+      } catch (err) {
+        addToast('error', `Failed to start download: ${String(err)}`);
+        updateProgress({
+          id,
+          progress: 0,
+          downloadedBytes: 0,
+          totalBytes: 0,
+          speed: 0,
+          eta: 0,
+          status: 'error',
+          error: String(err)
+        });
+      }
+      return;
+    }
 
     addToast('info', 'Fetching video information...');
 

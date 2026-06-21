@@ -79,25 +79,7 @@ export const TopBar: React.FC = () => {
         {/* Divider */}
         <div style={{ height: '20px', width: '1px', backgroundColor: 'var(--outline-variant)' }} />
 
-        {/* Notifications Icon Button */}
-        <button 
-          className="btn btn-ghost btn-icon flex-center"
-          style={{ position: 'relative', border: 'none' }}
-        >
-          <span className="icon">notifications</span>
-          <span 
-            style={{
-              position: 'absolute',
-              top: '4px',
-              right: '4px',
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--tertiary)',
-              border: '2px solid var(--surface-container-low)'
-            }}
-          />
-        </button>
+
 
         {/* Help Info Icon */}
         <button className="btn btn-ghost btn-icon flex-center" style={{ border: 'none' }}>
