@@ -9,6 +9,8 @@ export interface DownloadProgressPayload {
   eta: number;
   status: DownloadItem['status'];
   error?: string;
+  playlistIndex?: number | null;
+  playlistTotal?: number | null;
 }
 
 export interface SidecarMessage {

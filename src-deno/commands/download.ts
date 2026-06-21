@@ -35,10 +35,10 @@ export async function downloadMedia(
   args.push("-o", `${saveDir}/%(title)s.%(ext)s`);
 
   // Progress reporting formatting template
-  // Format: downloading:downloaded_bytes:total_bytes:speed:eta
+  // Format: downloading:downloaded_bytes:total_bytes:speed:eta:playlist_index:n_entries
   args.push(
     "--progress-template", 
-    "downloading:%(progress.downloaded_bytes)s:%(progress.total_bytes)s:%(progress.speed)s:%(progress.eta)s"
+    "downloading:%(progress.downloaded_bytes)s:%(progress.total_bytes)s:%(progress.speed)s:%(progress.eta)s:%(info.playlist_index)s:%(info.n_entries)s"
   );
 
   // Add target URL
@@ -80,6 +80,9 @@ export async function downloadMedia(
             const speed = parts[3] === "NA" ? 0 : parseInt(parts[3]) || 0;
             const eta = parts[4] === "NA" ? 0 : parseInt(parts[4]) || 0;
             
+            const playlistIndex = parts[5] && parts[5] !== "NA" ? parseInt(parts[5]) : null;
+            const playlistTotal = parts[6] && parts[6] !== "NA" ? parseInt(parts[6]) : null;
+            
             const progress = totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0;
 
             console.log(JSON.stringify({
@@ -89,7 +92,9 @@ export async function downloadMedia(
               totalBytes,
               speed,
               eta,
-              status: "downloading"
+              status: "downloading",
+              playlistIndex,
+              playlistTotal
             }));
           }
         }

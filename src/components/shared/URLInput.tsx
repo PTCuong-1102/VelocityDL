@@ -23,6 +23,14 @@ export interface AnalyzedMetadata {
   format: string;
   quality: string;
   platform: 'youtube' | 'tiktok' | 'facebook' | 'instagram' | 'other';
+  isPlaylist?: boolean;
+  totalItems?: number;
+  entries?: Array<{
+    title: string;
+    id: string;
+    duration: string;
+    url: string;
+  }>;
 }
 
 export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
@@ -268,14 +276,14 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                 />
               ) : null}
               <span 
-                className="icon text-muted" 
+                className="icon text-primary-color" 
                 style={{ 
                   position: 'absolute', 
                   fontSize: '36px',
-                  opacity: analyzedInfo.thumbnailUrl ? 0.3 : 0.7
+                  opacity: analyzedInfo.thumbnailUrl ? 0.35 : 0.8
                 }}
               >
-                {downloadMode === 'audio' ? 'music_note' : 'play_circle'}
+                {analyzedInfo.isPlaylist ? 'playlist_play' : (downloadMode === 'audio' ? 'music_note' : 'play_circle')}
               </span>
               
               {/* Duration overlay badge */}
@@ -315,6 +323,25 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   <span className="icon" style={{ fontSize: '12px' }}>{getPlatformIcon(analyzedInfo.platform)}</span>
                   <span>{getPlatformName(analyzedInfo.platform)}</span>
                 </div>
+
+                {analyzedInfo.isPlaylist && (
+                  <div 
+                    className="badge badge-primary"
+                    style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '4px', 
+                      padding: '4px 8px', 
+                      borderRadius: '4px',
+                      backgroundColor: 'rgba(195, 192, 255, 0.15)',
+                      color: 'var(--primary)',
+                      borderColor: 'rgba(195, 192, 255, 0.3)'
+                    }}
+                  >
+                    <span className="icon" style={{ fontSize: '12px' }}>playlist_play</span>
+                    <span>Playlist ({analyzedInfo.totalItems} videos)</span>
+                  </div>
+                )}
 
                 {/* Uploader name */}
                 {analyzedInfo.uploader && (

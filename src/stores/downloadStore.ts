@@ -28,17 +28,72 @@ export const useDownloadStore = create<DownloadState>((set) => ({
   updateProgress: (payload) => set((state) => ({
     downloads: state.downloads.map((item) => {
       if (item.id === payload.id) {
-        return {
-          ...item,
-          progress: payload.progress,
-          downloadedBytes: payload.downloadedBytes,
-          totalBytes: payload.totalBytes,
-          speed: payload.speed,
-          eta: payload.eta,
-          status: payload.status,
-          error: payload.error || item.error,
-          completedAt: payload.status === 'finished' ? Date.now() : item.completedAt,
-        };
+        if (item.isPlaylist) {
+          const playlistItem = item as any;
+          let completedItems = playlistItem.completedItems;
+          let totalItems = playlistItem.totalItems;
+          let progress = item.progress;
+          let children = playlistItem.children || [];
+
+          if (payload.playlistIndex != null && payload.playlistTotal != null) {
+            completedItems = payload.playlistIndex - 1;
+            totalItems = payload.playlistTotal;
+            progress = ((completedItems + (payload.progress / 100)) / totalItems) * 100;
+
+            children = children.map((child: any, idx: number) => {
+              if (idx < completedItems) {
+                return { ...child, status: 'finished', progress: 100, speed: 0 };
+              } else if (idx === completedItems) {
+                return {
+                  ...child,
+                  status: payload.status === 'finished' ? 'finished' : 'downloading',
+                  progress: payload.progress,
+                  speed: payload.speed,
+                  eta: payload.eta,
+                  downloadedBytes: payload.downloadedBytes,
+                  totalBytes: payload.totalBytes
+                };
+              }
+              return child;
+            });
+          }
+
+          if (payload.status === 'finished') {
+            completedItems = totalItems;
+            progress = 100;
+            children = children.map((child: any) => ({
+              ...child,
+              status: 'finished',
+              progress: 100,
+              speed: 0
+            }));
+          }
+
+          return {
+            ...item,
+            progress,
+            completedItems,
+            totalItems,
+            children,
+            status: payload.status,
+            speed: payload.status === 'finished' ? 0 : payload.speed,
+            eta: payload.status === 'finished' ? 0 : payload.eta,
+            error: payload.error || item.error,
+            completedAt: payload.status === 'finished' ? Date.now() : item.completedAt,
+          };
+        } else {
+          return {
+            ...item,
+            progress: payload.progress,
+            downloadedBytes: payload.downloadedBytes,
+            totalBytes: payload.totalBytes,
+            speed: payload.speed,
+            eta: payload.eta,
+            status: payload.status,
+            error: payload.error || item.error,
+            completedAt: payload.status === 'finished' ? Date.now() : item.completedAt,
+          };
+        }
       }
       return item;
     }),

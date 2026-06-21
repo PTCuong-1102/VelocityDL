@@ -38,25 +38,68 @@ export function useDownload() {
     const id = Math.random().toString(36).substring(2, 9);
     
     // Add default queued item in UI
-    addDownload({
-      id,
-      url,
-      title: prefetchedInfo?.title || 'Analyzing video URL...',
-      status: 'queued',
-      platform: prefetchedInfo?.platform || 'other',
-      mediaType: options.audioOnly ? 'audio' : 'video',
-      progress: 0,
-      downloadedBytes: 0,
-      totalBytes: 0,
-      speed: 0,
-      eta: 0,
-      format: options.audioOnly ? 'MP3' : 'MP4',
-      quality: prefetchedInfo?.quality || (options.audioOnly ? 'Hi-Res' : '1080p'),
-      thumbnailUrl: prefetchedInfo?.thumbnailUrl,
-      duration: prefetchedInfo?.duration,
-      createdAt: Date.now(),
-      outputPath: ''
-    });
+    if (prefetchedInfo?.isPlaylist) {
+      addDownload({
+        id,
+        url,
+        title: prefetchedInfo.title || 'Analyzing playlist URL...',
+        status: 'queued',
+        platform: prefetchedInfo.platform || 'other',
+        mediaType: options.audioOnly ? 'audio' : 'video',
+        progress: 0,
+        downloadedBytes: 0,
+        totalBytes: 0,
+        speed: 0,
+        eta: 0,
+        format: 'Playlist',
+        quality: 'Playlist',
+        thumbnailUrl: prefetchedInfo.thumbnailUrl,
+        duration: prefetchedInfo.duration,
+        createdAt: Date.now(),
+        outputPath: '',
+        isPlaylist: true,
+        playlistTitle: prefetchedInfo.title || 'Unknown Playlist',
+        totalItems: prefetchedInfo.totalItems || 0,
+        completedItems: 0,
+        children: prefetchedInfo.entries?.map((entry: any, index: number) => ({
+          id: `${id}-child-${index}`,
+          url: entry.url,
+          title: entry.title,
+          status: 'queued',
+          platform: prefetchedInfo.platform || 'other',
+          mediaType: options.audioOnly ? 'audio' : 'video',
+          progress: 0,
+          downloadedBytes: 0,
+          totalBytes: 0,
+          speed: 0,
+          eta: 0,
+          format: options.audioOnly ? 'MP3' : 'MP4',
+          quality: '1080p',
+          createdAt: Date.now(),
+          outputPath: ''
+        })) || []
+      } as any);
+    } else {
+      addDownload({
+        id,
+        url,
+        title: prefetchedInfo?.title || 'Analyzing video URL...',
+        status: 'queued',
+        platform: prefetchedInfo?.platform || 'other',
+        mediaType: options.audioOnly ? 'audio' : 'video',
+        progress: 0,
+        downloadedBytes: 0,
+        totalBytes: 0,
+        speed: 0,
+        eta: 0,
+        format: options.audioOnly ? 'MP3' : 'MP4',
+        quality: prefetchedInfo?.quality || (options.audioOnly ? 'Hi-Res' : '1080p'),
+        thumbnailUrl: prefetchedInfo?.thumbnailUrl,
+        duration: prefetchedInfo?.duration,
+        createdAt: Date.now(),
+        outputPath: ''
+      });
+    }
 
     if (prefetchedInfo) {
       addToast('info', `Starting download: ${prefetchedInfo.title || url}`);
