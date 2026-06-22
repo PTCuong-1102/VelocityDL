@@ -1,6 +1,7 @@
 import { ensureYtdlpInstalled, ensureFfmpegInstalled, ensureSpotdlInstalled } from "./commands/update.ts";
 import { getVideoInfo } from "./commands/info.ts";
 import { downloadMedia, DownloadOptions } from "./commands/download.ts";
+import { checkAppUpdate, downloadAppUpdate } from "./commands/appUpdate.ts";
 
 async function main() {
   const command = Deno.args[0];
@@ -8,14 +9,14 @@ async function main() {
   if (!command) {
     console.log(JSON.stringify({ 
       status: "error", 
-      message: "No command provided. Supported: info, download, update" 
+      message: "No command provided. Supported: info, download, update, check-app-update, download-app-update" 
     }));
     Deno.exit(1);
   }
 
   try {
-    // 1. For all commands except update, ensure yt-dlp, FFmpeg and spotDL are installed
-    if (command !== "update") {
+    // 1. For core download commands, ensure dependencies are installed
+    if (command !== "update" && command !== "check-app-update" && command !== "download-app-update") {
       await ensureYtdlpInstalled();
       await ensureFfmpegInstalled();
       await ensureSpotdlInstalled();
@@ -52,6 +53,26 @@ async function main() {
         await ensureYtdlpInstalled(true);
         await ensureFfmpegInstalled(true);
         await ensureSpotdlInstalled(true);
+        break;
+      }
+
+      case "check-app-update": {
+        const currentVersion = Deno.args[1];
+        if (!currentVersion) {
+          throw new Error("Missing currentVersion for check-app-update command");
+        }
+        await checkAppUpdate(currentVersion);
+        break;
+      }
+
+      case "download-app-update": {
+        const downloadUrl = Deno.args[1];
+        const saveDir = Deno.args[2];
+        const fileName = Deno.args[3];
+        if (!downloadUrl || !saveDir || !fileName) {
+          throw new Error("Missing arguments for download-app-update command. Args required: downloadUrl, saveDir, fileName");
+        }
+        await downloadAppUpdate(downloadUrl, saveDir, fileName);
         break;
       }
 

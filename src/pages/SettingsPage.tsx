@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import GlassPanel from '../components/ui/GlassPanel';
 import Toggle from '../components/ui/Toggle';
 import NumberStepper from '../components/ui/NumberStepper';
@@ -6,9 +6,96 @@ import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { useSettingsStore } from '../stores/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
+import { useTauriEvent } from '../hooks/useTauriEvent';
+import { getVersion } from '@tauri-apps/api/app';
 
 export const SettingsPage: React.FC = () => {
   const { settings, updateSetting, resetDefaults } = useSettingsStore();
+
+  // App Update States
+  const [currentVersion, setCurrentVersion] = useState('0.2.1');
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'no-update' | 'downloading' | 'ready' | 'error'>('idle');
+  const [updateInfo, setUpdateInfo] = useState<{
+    latestVersion: string;
+    changelog: string;
+    downloadUrl: string;
+    fileName: string;
+  } | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [installerPath, setInstallerPath] = useState('');
+
+  useEffect(() => {
+    getVersion().then(setCurrentVersion).catch(console.error);
+  }, []);
+
+  // Listen for update download progress events from sidecar
+  useTauriEvent<any>('update-progress', (event) => {
+    const payload = event.payload;
+    if (payload.status === 'downloading') {
+      setUpdateStatus('downloading');
+      setDownloadProgress(payload.progress || 0);
+    } else if (payload.status === 'ready' && payload.filePath) {
+      setUpdateStatus('ready');
+      setInstallerPath(payload.filePath);
+    } else if (payload.status === 'error') {
+      setUpdateStatus('error');
+      setErrorMsg(payload.message || 'Download failed');
+    }
+  });
+
+  const handleCheckUpdate = async () => {
+    setUpdateStatus('checking');
+    setErrorMsg('');
+    try {
+      const res = await invoke<any>('check_app_update', { currentVersion });
+      if (res.updateAvailable) {
+        setUpdateStatus('available');
+        setUpdateInfo({
+          latestVersion: res.latestVersion,
+          changelog: res.changelog,
+          downloadUrl: res.downloadUrl,
+          fileName: res.fileName,
+        });
+      } else {
+        setUpdateStatus('no-update');
+      }
+    } catch (err) {
+      console.error(err);
+      setUpdateStatus('error');
+      setErrorMsg(String(err));
+    }
+  };
+
+  const handleDownloadUpdate = async () => {
+    if (!updateInfo) return;
+    setUpdateStatus('downloading');
+    setDownloadProgress(0);
+    setErrorMsg('');
+    try {
+      const saveDir = settings.storage.defaultDownloadPath || '.';
+      await invoke('start_app_update_download', {
+        url: updateInfo.downloadUrl,
+        saveDir,
+        fileName: updateInfo.fileName,
+      });
+    } catch (err) {
+      console.error(err);
+      setUpdateStatus('error');
+      setErrorMsg(String(err));
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    if (!installerPath) return;
+    try {
+      await invoke('open_file', { path: installerPath });
+      await invoke('exit_app');
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to execute installer: ${err}`);
+    }
+  };
 
   const handleBrowsePath = async () => {
     try {
@@ -230,8 +317,133 @@ export const SettingsPage: React.FC = () => {
                   onChange={(e) => updateSetting('general', 'launchOnBoot', e.target.checked)}
                 />
               </div>
+            </div>
+          </GlassPanel>
 
+          {/* Application Update Panel */}
+          <GlassPanel>
+            <h2 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="icon text-secondary-color">system_update_alt</span>
+              App Update
+            </h2>
 
+            <div className="flex-col gap-md" style={{ fontSize: '13px' }}>
+              <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500 }}>Current Version</span>
+                <span className="text-muted" style={{ fontWeight: 600 }}>v{currentVersion}</span>
+              </div>
+
+              <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
+
+              {/* Status Rendering */}
+              {updateStatus === 'idle' && (
+                <div className="flex-col gap-sm">
+                  <span className="text-muted" style={{ fontSize: '11px' }}>Check for the latest features and security updates.</span>
+                  <Button variant="primary" onClick={handleCheckUpdate} style={{ width: '100%' }}>
+                    Check for Updates
+                  </Button>
+                </div>
+              )}
+
+              {updateStatus === 'checking' && (
+                <div className="flex-col gap-sm" style={{ alignItems: 'center', padding: '12px 0' }}>
+                  <span className="icon text-primary-color" style={{ fontSize: '24px', animation: 'pulse 1s infinite ease-in-out' }}>sync</span>
+                  <span style={{ fontSize: '12px' }} className="text-muted">Checking GitHub repository...</span>
+                </div>
+              )}
+
+              {updateStatus === 'no-update' && (
+                <div className="flex-col gap-sm">
+                  <div className="flex-row gap-xs" style={{ alignItems: 'center', color: '#6bd8cb' }}>
+                    <span className="icon" style={{ fontSize: '18px' }}>check_circle</span>
+                    <span style={{ fontWeight: 500 }}>Up to date</span>
+                  </div>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>You are on the latest version of VelocityDL.</span>
+                  <Button variant="ghost" onClick={handleCheckUpdate} style={{ width: '100%', marginTop: '4px' }}>
+                    Check Again
+                  </Button>
+                </div>
+              )}
+
+              {updateStatus === 'available' && updateInfo && (
+                <div className="flex-col gap-sm">
+                  <div className="flex-row gap-xs" style={{ alignItems: 'center', color: '#ffb95f' }}>
+                    <span className="icon" style={{ fontSize: '18px' }}>info</span>
+                    <span style={{ fontWeight: 500 }}>New update v{updateInfo.latestVersion}</span>
+                  </div>
+                  
+                  {/* Changelog box */}
+                  <div 
+                    style={{ 
+                      maxHeight: '100px', 
+                      overflowY: 'auto', 
+                      padding: '8px', 
+                      backgroundColor: 'rgba(0,0,0,0.2)', 
+                      borderRadius: '8px',
+                      fontSize: '11px',
+                      lineHeight: '1.4',
+                      border: '1px solid var(--outline-variant)',
+                      whiteSpace: 'pre-wrap'
+                    }}
+                    className="custom-scrollbar text-muted"
+                  >
+                    {updateInfo.changelog || 'No release notes provided.'}
+                  </div>
+
+                  <Button variant="primary" onClick={handleDownloadUpdate} style={{ width: '100%', marginTop: '4px' }}>
+                    Download & Install
+                  </Button>
+                </div>
+              )}
+
+              {updateStatus === 'downloading' && (
+                <div className="flex-col gap-sm">
+                  <div className="flex-row" style={{ justifyContent: 'space-between' }}>
+                    <span style={{ fontWeight: 500 }}>Downloading update...</span>
+                    <span>{downloadProgress}%</span>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    height: '6px',
+                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    borderRadius: '3px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${downloadProgress}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%)',
+                      transition: 'width 0.2s ease-out'
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              {updateStatus === 'ready' && (
+                <div className="flex-col gap-sm">
+                  <div className="flex-row gap-xs" style={{ alignItems: 'center', color: '#6bd8cb' }}>
+                    <span className="icon" style={{ fontSize: '18px' }}>download_done</span>
+                    <span style={{ fontWeight: 500 }}>Download completed!</span>
+                  </div>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>The update has been downloaded. Ready to install.</span>
+                  <Button variant="primary" onClick={handleInstallUpdate} style={{ width: '100%', marginTop: '4px' }}>
+                    Restart & Install
+                  </Button>
+                </div>
+              )}
+
+              {updateStatus === 'error' && (
+                <div className="flex-col gap-sm">
+                  <div className="flex-row gap-xs" style={{ alignItems: 'center', color: '#ffb4ab' }}>
+                    <span className="icon" style={{ fontSize: '18px' }}>error</span>
+                    <span style={{ fontWeight: 500 }}>Update failed</span>
+                  </div>
+                  <span className="text-muted" style={{ fontSize: '11px', wordBreak: 'break-all' }}>{errorMsg}</span>
+                  <Button variant="ghost" onClick={handleCheckUpdate} style={{ width: '100%', marginTop: '4px' }}>
+                    Retry Check
+                  </Button>
+                </div>
+              )}
             </div>
           </GlassPanel>
         </div>
