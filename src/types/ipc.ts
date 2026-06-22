@@ -11,6 +11,7 @@ export interface DownloadProgressPayload {
   error?: string;
   playlistIndex?: number | null;
   playlistTotal?: number | null;
+  outputPath?: string;
 }
 
 export interface SidecarMessage {

@@ -47,6 +47,7 @@ export async function downloadMedia(
       let playlistIndex = 1;
       let playlistTotal = null;
       let lastEmitTime = 0;
+      let outputPath = "";
 
       while (true) {
         const { value, done } = await stdoutReader.read();
@@ -59,6 +60,12 @@ export async function downloadMedia(
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed) continue;
+
+          // SpotDL output: Downloaded "song": /path/to/song.mp3
+          if (trimmed.startsWith('Downloaded "')) {
+            const match = trimmed.match(/Downloaded ".*":\s*(.*)/);
+            if (match) outputPath = match[1].trim();
+          }
 
           const totalMatch = trimmed.match(/Total\s+(\d+)\/(\d+)\s+complete/i);
           if (totalMatch) {
@@ -84,7 +91,8 @@ export async function downloadMedia(
                 eta: 0,
                 status: "downloading",
                 playlistIndex,
-                playlistTotal
+                playlistTotal,
+                outputPath: outputPath || undefined
               }));
             }
           }
@@ -97,7 +105,8 @@ export async function downloadMedia(
         console.log(JSON.stringify({
           id,
           progress: 100,
-          status: "finished"
+          status: "finished",
+          outputPath: outputPath || undefined
         }));
       } else {
         const errorBytes = await child.stderr.getReader().read();
@@ -175,6 +184,7 @@ export async function downloadMedia(
     const stdoutReader = child.stdout.getReader();
     let buffer = "";
     let lastEmitTime = 0;
+    let outputPath = "";
 
     // Read progress stdout stream in real time
     while (true) {
@@ -189,6 +199,23 @@ export async function downloadMedia(
 
       for (const line of lines) {
         const trimmed = line.trim();
+
+        // Extract output path
+        if (trimmed.includes('[download] Destination: ')) {
+          outputPath = trimmed.split('[download] Destination: ')[1].trim();
+        } else if (trimmed.includes('has already been downloaded')) {
+          const match = trimmed.match(/\[download\]\s+(.*?)\s+has already been downloaded/);
+          if (match) outputPath = match[1].trim();
+        } else if (trimmed.includes('[Merger] Merging formats into "')) {
+          const match = trimmed.match(/\[Merger\] Merging formats into "(.*?)"/);
+          if (match) outputPath = match[1].trim();
+        } else if (trimmed.includes('Remuxing video from') && trimmed.includes('to "')) {
+          const match = trimmed.match(/to "(.*?)"/);
+          if (match) outputPath = match[1].trim();
+        } else if (trimmed.includes('[FixupM4a] Correcting container of "')) {
+          const match = trimmed.match(/\[FixupM4a\] Correcting container of "(.*?)"/);
+          if (match) outputPath = match[1].trim();
+        }
 
         // Handle merge/postprocess status
         if (trimmed.startsWith("postprocess:merging:")) {
@@ -205,7 +232,8 @@ export async function downloadMedia(
             eta: 0,
             status: "merging",
             playlistIndex,
-            playlistTotal
+            playlistTotal,
+            outputPath: outputPath || undefined
           }));
           continue;
         }
@@ -238,7 +266,8 @@ export async function downloadMedia(
                 eta,
                 status: "downloading",
                 playlistIndex,
-                playlistTotal
+                playlistTotal,
+                outputPath: outputPath || undefined
               }));
             }
           }
@@ -253,7 +282,8 @@ export async function downloadMedia(
       console.log(JSON.stringify({
         id,
         progress: 100,
-        status: "finished"
+        status: "finished",
+        outputPath: outputPath || undefined
       }));
     } else {
       const errorBytes = await child.stderr.getReader().read();

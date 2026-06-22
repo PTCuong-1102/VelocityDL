@@ -51,7 +51,8 @@ export const useDownloadStore = create<DownloadState>((set) => ({
                   speed: payload.speed,
                   eta: payload.eta,
                   downloadedBytes: payload.downloadedBytes,
-                  totalBytes: payload.totalBytes
+                  totalBytes: payload.totalBytes,
+                  outputPath: payload.outputPath || child.outputPath
                 };
               }
               return child;
@@ -80,6 +81,7 @@ export const useDownloadStore = create<DownloadState>((set) => ({
             eta: payload.status === 'finished' ? 0 : payload.eta,
             error: payload.error || item.error,
             completedAt: payload.status === 'finished' ? Date.now() : item.completedAt,
+            outputPath: payload.outputPath || item.outputPath,
           };
         } else {
           return {
@@ -92,6 +94,7 @@ export const useDownloadStore = create<DownloadState>((set) => ({
             status: payload.status,
             error: payload.error || item.error,
             completedAt: payload.status === 'finished' ? Date.now() : item.completedAt,
+            outputPath: payload.outputPath || item.outputPath,
           };
         }
       }
