@@ -46,6 +46,7 @@ export async function downloadMedia(
       let buffer = "";
       let playlistIndex = 1;
       let playlistTotal = null;
+      let lastEmitTime = 0;
 
       while (true) {
         const { value, done } = await stdoutReader.read();
@@ -70,18 +71,22 @@ export async function downloadMedia(
           const percentMatch = trimmed.match(/(\d+)%/);
           if (percentMatch) {
             const progress = parseInt(percentMatch[1]);
+            const now = Date.now();
 
-            console.log(JSON.stringify({
-              id,
-              progress,
-              downloadedBytes: 0,
-              totalBytes: 0,
-              speed: 0,
-              eta: 0,
-              status: "downloading",
-              playlistIndex,
-              playlistTotal
-            }));
+            if (now - lastEmitTime >= 200 || progress === 100) {
+              lastEmitTime = now;
+              console.log(JSON.stringify({
+                id,
+                progress,
+                downloadedBytes: 0,
+                totalBytes: 0,
+                speed: 0,
+                eta: 0,
+                status: "downloading",
+                playlistIndex,
+                playlistTotal
+              }));
+            }
           }
         }
       }
@@ -169,6 +174,7 @@ export async function downloadMedia(
     const decoder = new TextDecoder();
     const stdoutReader = child.stdout.getReader();
     let buffer = "";
+    let lastEmitTime = 0;
 
     // Read progress stdout stream in real time
     while (true) {
@@ -220,17 +226,21 @@ export async function downloadMedia(
             
             const progress = totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0;
 
-            console.log(JSON.stringify({
-              id,
-              progress,
-              downloadedBytes,
-              totalBytes,
-              speed,
-              eta,
-              status: "downloading",
-              playlistIndex,
-              playlistTotal
-            }));
+            const now = Date.now();
+            if (now - lastEmitTime >= 200 || progress === 100) {
+              lastEmitTime = now;
+              console.log(JSON.stringify({
+                id,
+                progress,
+                downloadedBytes,
+                totalBytes,
+                speed,
+                eta,
+                status: "downloading",
+                playlistIndex,
+                playlistTotal
+              }));
+            }
           }
         }
       }

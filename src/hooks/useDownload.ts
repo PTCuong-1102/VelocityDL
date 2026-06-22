@@ -21,12 +21,48 @@ export function useDownload() {
   // Listen for real-time progress events from Tauri
   useTauriEvent<any>('download-progress', (event) => {
     const payload = event.payload;
+
+    // Track completed items before updating state to detect when a video completes in a playlist
+    const beforeItem = useDownloadStore.getState().downloads.find((d) => d.id === payload.id);
+
     updateProgress(payload);
+
+    // If it's a playlist, detect child video completion by comparing completedItems
+    if (beforeItem && beforeItem.isPlaylist && payload.playlistIndex != null) {
+      const beforeCompleted = (beforeItem as any).completedItems || 0;
+      const afterCompleted = payload.playlistIndex - 1;
+
+      if (afterCompleted > beforeCompleted) {
+        // Show success notification for each child video completed in this progress step
+        for (let i = beforeCompleted; i < afterCompleted; i++) {
+          const child = (beforeItem as any).children?.[i];
+          const childTitle = child?.title || `Video #${i + 1}`;
+          addToast('success', `✓ Completed: ${childTitle}`);
+        }
+      }
+    }
+
     // Show success toast when a download completes
     if (payload.status === 'finished') {
       const item = useDownloadStore.getState().downloads.find((d) => d.id === payload.id);
-      const title = item?.title || 'Download';
-      addToast('success', `✓ Completed: ${title}`);
+      if (item) {
+        if (item.isPlaylist) {
+          // Notify the last video in the playlist if it wasn't notified yet
+          const beforeCompleted = (item as any).completedItems || 0;
+          const totalItems = (item as any).totalItems || 0;
+          if (totalItems > beforeCompleted) {
+            for (let i = beforeCompleted; i < totalItems; i++) {
+              const child = (item as any).children?.[i];
+              const childTitle = child?.title || `Video #${i + 1}`;
+              addToast('success', `✓ Completed: ${childTitle}`);
+            }
+          }
+          addToast('success', `✓ Playlist download completed: ${item.title}`);
+        } else {
+          const title = item.title || 'Download';
+          addToast('success', `✓ Completed: ${title}`);
+        }
+      }
     }
     // Show error toast when a download fails
     if (payload.status === 'error' && payload.error) {
