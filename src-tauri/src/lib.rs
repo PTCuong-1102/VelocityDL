@@ -22,6 +22,7 @@ pub fn run() {
             commands::download::get_video_info,
             commands::settings::get_default_download_path,
             commands::settings::browse_directory,
+            commands::settings::browse_cookie_file,
             commands::settings::load_settings,
             commands::settings::save_settings,
             commands::filesystem::open_file,

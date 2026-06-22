@@ -109,6 +109,17 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleBrowseCookieFile = async () => {
+    try {
+      const selectedPath = await invoke<string | null>('browse_cookie_file');
+      if (selectedPath) {
+        updateSetting('engine', 'cookieFilePath', selectedPath);
+      }
+    } catch (err) {
+      console.error('Failed to browse cookie file:', err);
+    }
+  };
+
   const handleSave = async () => {
     try {
       await invoke('save_settings', { settings });
@@ -209,6 +220,56 @@ export const SettingsPage: React.FC = () => {
                     style={{ height: '38px', fontSize: '13px' }}
                   />
                 </div>
+              </div>
+
+              <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
+
+              {/* Cookie Settings */}
+              <div className="flex-col gap-sm">
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>Cookie Authentication (Instagram/TikTok Stories)</span>
+                <div className="flex-row gap-sm">
+                  <select
+                    style={{
+                      backgroundColor: 'var(--surface-container-lowest)',
+                      border: '1px solid var(--outline-variant)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--on-surface)',
+                      padding: '8px 12px',
+                      outline: 'none',
+                      fontSize: '13px',
+                      height: '38px',
+                      cursor: 'pointer',
+                      flexGrow: 1
+                    }}
+                    value={settings.engine.cookieSource}
+                    onChange={(e) => updateSetting('engine', 'cookieSource', e.target.value as any)}
+                  >
+                    <option value="none">No Cookies (None)</option>
+                    <option value="chrome">Google Chrome</option>
+                    <option value="firefox">Mozilla Firefox</option>
+                    <option value="edge">Microsoft Edge</option>
+                    <option value="safari">Apple Safari</option>
+                    <option value="opera">Opera</option>
+                    <option value="file">Use cookies.txt file</option>
+                  </select>
+                </div>
+                {settings.engine.cookieSource === 'file' && (
+                  <div className="flex-row gap-sm" style={{ marginTop: '4px' }}>
+                    <Input
+                      readOnly
+                      placeholder="Select cookies.txt file..."
+                      value={settings.engine.cookieFilePath || 'No cookie file selected'}
+                      style={{ height: '38px', fontSize: '13px' }}
+                    />
+                    <Button variant="ghost" onClick={handleBrowseCookieFile} style={{ height: '38px' }}>
+                      Browse
+                    </Button>
+                  </div>
+                )}
+                <span className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
+                  Stories require authentication. If choosing a browser, ensure you are logged in to Instagram/TikTok in that browser. 
+                  Alternatively, export and upload a <code>cookies.txt</code> file.
+                </span>
               </div>
 
               <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />

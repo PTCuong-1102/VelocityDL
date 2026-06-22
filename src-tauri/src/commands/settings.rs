@@ -19,6 +19,16 @@ pub fn browse_directory(app: tauri::AppHandle) -> Option<String> {
 }
 
 #[tauri::command]
+pub fn browse_cookie_file(app: tauri::AppHandle) -> Option<String> {
+    app.dialog()
+        .file()
+        .add_filter("Cookie text files", &["txt"])
+        .blocking_pick_file()
+        .and_then(|path| path.into_path().ok())
+        .map(|path| path.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
 pub fn load_settings(app: tauri::AppHandle) -> Result<Value, String> {
     let config_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     let settings_file = config_dir.join("settings.json");

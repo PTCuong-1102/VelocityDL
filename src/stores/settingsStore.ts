@@ -18,6 +18,8 @@ const DEFAULT_SETTINGS: AppSettings = {
     proxyType: 'HTTP',
     proxyAddress: '',
     autoUpdateYtdlp: true,
+    cookieSource: 'none',
+    cookieFilePath: '',
   },
   storage: {
     defaultDownloadPath: '', // Will be filled dynamically by Tauri on startup

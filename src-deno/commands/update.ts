@@ -1,4 +1,4 @@
-import { getYtdlpPath, getBinDir, getFfmpegPath, getFfprobePath, getFfmpegDir, getSpotdlPath } from "../utils/paths.ts";
+import { getYtdlpPath, getBinDir, getFfmpegPath, getFfprobePath, getFfmpegDir, getSpotdlPath, getGallerydlPath, getInstaloaderPath } from "../utils/paths.ts";
 
 export async function ensureYtdlpInstalled(forceUpdate = false): Promise<string> {
   const ytdlpPath = getYtdlpPath();
@@ -462,6 +462,216 @@ export async function ensureSpotdlInstalled(forceUpdate = false): Promise<string
     console.log(JSON.stringify({ 
       status: "error", 
       message: `Failed to install spotDL: ${errorMsg}` 
+    }));
+    throw err;
+  }
+}
+
+export async function ensureGallerydlInstalled(forceUpdate = false): Promise<string> {
+  const gallerydlPath = getGallerydlPath();
+  const binDir = getBinDir();
+
+  // Check if binary exists
+  let exists = false;
+  try {
+    const stat = await Deno.stat(gallerydlPath);
+    exists = stat.isFile;
+  } catch (_err) {
+    exists = false;
+  }
+
+  if (exists && !forceUpdate) {
+    return gallerydlPath;
+  }
+
+  console.log(JSON.stringify({ 
+    status: "updating", 
+    message: exists ? "Checking for gallery-dl update..." : "Downloading gallery-dl binary..." 
+  }));
+
+  // Create bin folder if missing
+  await Deno.mkdir(binDir, { recursive: true });
+
+  const isWindows = Deno.build.os === "windows";
+  let url = "";
+
+  try {
+    const response = await fetch("https://codeberg.org/api/v1/repos/mikf/gallery-dl/releases");
+    if (response.ok) {
+      const releases = await response.json();
+      if (releases && releases.length > 0) {
+        const latestRelease = releases[0];
+        const assets = latestRelease.assets || [];
+        let matchedAsset;
+        if (isWindows) {
+          matchedAsset = assets.find((a: any) => a.name === "gallery-dl.exe");
+        } else {
+          matchedAsset = assets.find((a: any) => a.name === "gallery-dl.bin");
+        }
+        if (matchedAsset && matchedAsset.browser_download_url) {
+          url = matchedAsset.browser_download_url;
+        }
+      }
+    }
+  } catch (err) {
+    console.error(JSON.stringify({
+      status: "warning",
+      message: `Failed to fetch latest gallery-dl release info: ${err instanceof Error ? err.message : String(err)}. Using fallback.`
+    }));
+  }
+
+  if (!url) {
+    const fallbackVersion = "1.32.4";
+    if (isWindows) {
+      url = `https://codeberg.org/mikf/gallery-dl/releases/download/v${fallbackVersion}/gallery-dl.exe`;
+    } else {
+      url = `https://codeberg.org/mikf/gallery-dl/releases/download/v${fallbackVersion}/gallery-dl.bin`;
+    }
+  }
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch: ${response.statusText}`);
+    }
+
+    const file = await Deno.open(gallerydlPath, { write: true, create: true, truncate: true });
+    await response.body?.pipeTo(file.writable);
+
+    if (!isWindows) {
+      await Deno.chmod(gallerydlPath, 0o755); // Make it executable on macOS/Linux
+    }
+
+    console.log(JSON.stringify({ 
+      status: "ready", 
+      message: exists ? "gallery-dl updated successfully" : "gallery-dl installed successfully" 
+    }));
+    
+    return gallerydlPath;
+  } catch (err) {
+    // Clean up a possibly corrupt binary
+    try { await Deno.remove(gallerydlPath); } catch (_) { /* ignore */ }
+
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.log(JSON.stringify({ 
+      status: "error", 
+      message: `Failed to install gallery-dl: ${errorMsg}` 
+    }));
+    throw err;
+  }
+}
+
+export async function ensureInstaloaderInstalled(forceUpdate = false): Promise<string> {
+  const instaloaderPath = getInstaloaderPath();
+  const binDir = getBinDir();
+  const isWindows = Deno.build.os === "windows";
+
+  if (!isWindows) {
+    // On macOS/Linux, we don't download since no standalone binary is provided.
+    // We assume the user has python/pip installed it or it's in the system PATH.
+    return "instaloader";
+  }
+
+  // Check if binary exists
+  let exists = false;
+  try {
+    const stat = await Deno.stat(instaloaderPath);
+    exists = stat.isFile;
+  } catch (_err) {
+    exists = false;
+  }
+
+  if (exists && !forceUpdate) {
+    return instaloaderPath;
+  }
+
+  console.log(JSON.stringify({ 
+    status: "updating", 
+    message: exists ? "Checking for Instaloader update..." : "Downloading Instaloader binary..." 
+  }));
+
+  // Create bin folder if missing
+  await Deno.mkdir(binDir, { recursive: true });
+
+  let url = "";
+  try {
+    const response = await fetch("https://api.github.com/repos/instaloader/instaloader/releases/latest");
+    if (response.ok) {
+      const releaseData = await response.json();
+      const assets = releaseData.assets || [];
+      const matchedAsset = assets.find((a: any) => a.name.endsWith("-windows-standalone.zip"));
+      if (matchedAsset && matchedAsset.browser_download_url) {
+        url = matchedAsset.browser_download_url;
+      }
+    }
+  } catch (err) {
+    console.error(JSON.stringify({
+      status: "warning",
+      message: `Failed to fetch latest Instaloader release info: ${err instanceof Error ? err.message : String(err)}. Using fallback.`
+    }));
+  }
+
+  if (!url) {
+    const fallbackVersion = "4.15.1";
+    url = `https://github.com/instaloader/instaloader/releases/download/v${fallbackVersion}/instaloader-v${fallbackVersion}-windows-standalone.zip`;
+  }
+
+  const tempZip = await Deno.makeTempFile({ suffix: ".zip" });
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch: ${response.statusText}`);
+    }
+
+    const file = await Deno.open(tempZip, { write: true, create: true, truncate: true });
+    await response.body?.pipeTo(file.writable);
+
+    // Extract instaloader.exe from zip
+    console.log(JSON.stringify({
+      status: "updating",
+      message: "Extracting Instaloader binary..."
+    }));
+
+    const tempExtractDir = await Deno.makeTempDir();
+
+    const extractCmd = new Deno.Command("powershell", {
+      args: [
+        "-NoProfile", "-NonInteractive", "-Command",
+        `Expand-Archive -Path '${tempZip}' -DestinationPath '${tempExtractDir}' -Force`
+      ],
+      stdout: "piped",
+      stderr: "piped"
+    });
+
+    const extractResult = await extractCmd.output();
+    if (!extractResult.success) {
+      const errStr = new TextDecoder().decode(extractResult.stderr);
+      throw new Error(`Failed to extract Instaloader zip: ${errStr}`);
+    }
+
+    const extractedExe = `${tempExtractDir}\\instaloader.exe`;
+    await Deno.copyFile(extractedExe, instaloaderPath);
+
+    // Clean up temp
+    try { await Deno.remove(tempZip); } catch (_) { /* ignore */ }
+    try { await Deno.remove(tempExtractDir, { recursive: true }); } catch (_) { /* ignore */ }
+
+    console.log(JSON.stringify({ 
+      status: "ready", 
+      message: exists ? "Instaloader updated successfully" : "Instaloader installed successfully" 
+    }));
+    
+    return instaloaderPath;
+  } catch (err) {
+    // Clean up
+    try { await Deno.remove(tempZip); } catch (_) { /* ignore */ }
+    try { await Deno.remove(instaloaderPath); } catch (_) { /* ignore */ }
+
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.log(JSON.stringify({ 
+      status: "error", 
+      message: `Failed to install Instaloader: ${errorMsg}` 
     }));
     throw err;
   }

@@ -4,6 +4,8 @@ export interface AppSettings {
     proxyType: 'HTTP' | 'SOCKS5';
     proxyAddress: string;
     autoUpdateYtdlp: boolean;
+    cookieSource: 'none' | 'chrome' | 'firefox' | 'edge' | 'safari' | 'opera' | 'file';
+    cookieFilePath: string;
   };
   storage: {
     defaultDownloadPath: string;

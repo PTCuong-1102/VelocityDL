@@ -1,4 +1,4 @@
-import { ensureYtdlpInstalled, ensureFfmpegInstalled, ensureSpotdlInstalled } from "./commands/update.ts";
+import { ensureYtdlpInstalled, ensureFfmpegInstalled, ensureSpotdlInstalled, ensureGallerydlInstalled, ensureInstaloaderInstalled } from "./commands/update.ts";
 import { getVideoInfo } from "./commands/info.ts";
 import { downloadMedia, DownloadOptions } from "./commands/download.ts";
 import { checkAppUpdate, downloadAppUpdate } from "./commands/appUpdate.ts";
@@ -20,6 +20,8 @@ async function main() {
       await ensureYtdlpInstalled();
       await ensureFfmpegInstalled();
       await ensureSpotdlInstalled();
+      await ensureGallerydlInstalled();
+      await ensureInstaloaderInstalled();
     }
 
     // 2. Command Router
@@ -53,6 +55,8 @@ async function main() {
         await ensureYtdlpInstalled(true);
         await ensureFfmpegInstalled(true);
         await ensureSpotdlInstalled(true);
+        await ensureGallerydlInstalled(true);
+        await ensureInstaloaderInstalled(true);
         break;
       }
 

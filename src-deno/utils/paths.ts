@@ -44,3 +44,52 @@ export function getSpotdlPath(): string {
   const binaryName = isWindows ? "spotdl.exe" : "spotdl";
   return path.join(binDir, binaryName);
 }
+
+export function getGallerydlPath(): string {
+  const binDir = getBinDir();
+  const isWindows = Deno.build.os === "windows";
+  const binaryName = isWindows ? "gallery-dl.exe" : "gallery-dl.bin";
+  return path.join(binDir, binaryName);
+}
+
+export function getInstaloaderPath(): string {
+  const binDir = getBinDir();
+  const isWindows = Deno.build.os === "windows";
+  const binaryName = isWindows ? "instaloader.exe" : "instaloader";
+  return path.join(binDir, binaryName);
+}
+
+export function getAppConfigDir(): string {
+  const isWindows = Deno.build.os === "windows";
+  const isMac = Deno.build.os === "darwin";
+  
+  if (isWindows) {
+    const appData = Deno.env.get("APPDATA") || ".";
+    return path.join(appData, "com.ptcmh.velocitydl");
+  } else if (isMac) {
+    const home = Deno.env.get("HOME") || ".";
+    return path.join(home, "Library", "Application Support", "com.ptcmh.velocitydl");
+  } else {
+    const configHome = Deno.env.get("XDG_CONFIG_HOME");
+    if (configHome) {
+      return path.join(configHome, "com.ptcmh.velocitydl");
+    }
+    const home = Deno.env.get("HOME") || ".";
+    return path.join(home, ".config", "com.ptcmh.velocitydl");
+  }
+}
+
+export function getSettingsPath(): string {
+  return path.join(getAppConfigDir(), "settings.json");
+}
+
+export async function getSettings(): Promise<any> {
+  try {
+    const p = getSettingsPath();
+    const content = await Deno.readTextFile(p);
+    return JSON.parse(content);
+  } catch (_) {
+    return {};
+  }
+}
+

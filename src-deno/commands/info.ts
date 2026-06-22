@@ -71,7 +71,113 @@ function formatQuality(width: number, height: number): string {
 }
 
 export async function getVideoInfo(url: string): Promise<void> {
-  const isSpotify = url.toLowerCase().includes("spotify.com") || url.toLowerCase().includes("open.spotify.com");
+  const lowerUrl = url.toLowerCase();
+
+  // Facebook Stories Check
+  if (lowerUrl.includes("facebook.com/stories") || lowerUrl.includes("facebook.com/story")) {
+    console.log(JSON.stringify({
+      status: "error",
+      message: "Facebook Stories are currently not supported due to security and API restrictions."
+    }));
+    return;
+  }
+
+  // Instagram Stories Check
+  if (lowerUrl.includes("instagram.com/stories") || (lowerUrl.includes("instagram.com") && lowerUrl.includes("/stories/"))) {
+    const match = url.match(/instagram\.com\/stories\/([a-zA-Z0-9_\.]+)/i);
+    const username = match ? match[1] : "Instagram User";
+    const payload = {
+      type: "info",
+      data: {
+        isPlaylist: false,
+        title: `Instagram Stories of @${username}`,
+        thumbnailUrl: "https://www.instagram.com/static/images/web/logged_out_wordmark.png/11a9e54e5491.png",
+        duration: "Active Stories",
+        durationSeconds: 0,
+        uploader: username,
+        format: "mp4",
+        quality: "HD",
+        availableQualities: ["HD"],
+        platform: "instagram"
+      }
+    };
+    console.log(JSON.stringify(payload));
+    return;
+  }
+
+  // Facebook Photo / Album / Post Check (excluding video pages like watch/videos/reel)
+  if (lowerUrl.includes("facebook.com") && 
+      !lowerUrl.includes("/videos/") && 
+      !lowerUrl.includes("/watch") && 
+      !lowerUrl.includes("/reel/") && 
+      (lowerUrl.includes("/photo") || lowerUrl.includes("/posts/") || lowerUrl.includes("/permalink") || lowerUrl.includes("/media/"))) {
+    const payload = {
+      type: "info",
+      data: {
+        isPlaylist: false,
+        title: "Facebook Post / Photo",
+        thumbnailUrl: "https://www.facebook.com/favicon.ico",
+        duration: "Image/Post",
+        durationSeconds: 0,
+        uploader: "Facebook Creator",
+        format: "jpg",
+        quality: "HD",
+        availableQualities: ["HD"],
+        platform: "facebook"
+      }
+    };
+    console.log(JSON.stringify(payload));
+    return;
+  }
+
+  // Instagram Posts (Photos, Videos, Reels) Check
+  if (lowerUrl.includes("instagram.com") && (lowerUrl.includes("/p/") || lowerUrl.includes("/reel/") || lowerUrl.includes("/reels/"))) {
+    const match = url.match(/instagram\.com\/(?:p|reel|reels)\/([a-zA-Z0-9_\-]+)/i);
+    const shortcode = match ? match[1] : "Post";
+    const payload = {
+      type: "info",
+      data: {
+        isPlaylist: false,
+        title: `Instagram Post [${shortcode}]`,
+        thumbnailUrl: "https://www.instagram.com/static/images/web/logged_out_wordmark.png/11a9e54e5491.png",
+        duration: "Post Media",
+        durationSeconds: 0,
+        uploader: "Instagram Creator",
+        format: "mp4/jpg",
+        quality: "HD",
+        availableQualities: ["HD"],
+        platform: "instagram"
+      }
+    };
+    console.log(JSON.stringify(payload));
+    return;
+  }
+
+  // TikTok Stories / Slideshows Check
+  if (lowerUrl.includes("tiktok.com") && (lowerUrl.includes("/story/") || lowerUrl.includes("/photo/"))) {
+    const match = url.match(/tiktok\.com\/@([a-zA-Z0-9_\.]+)/i);
+    const username = match ? match[1] : "TikTok User";
+    const isPhoto = lowerUrl.includes("/photo/");
+    const payload = {
+      type: "info",
+      data: {
+        isPlaylist: false,
+        title: isPhoto ? `TikTok Photo Slideshow by @${username}` : `TikTok Story by @${username}`,
+        thumbnailUrl: "https://www.tiktok.com/favicon.ico",
+        duration: isPhoto ? "Slideshow" : "Story",
+        durationSeconds: 0,
+        uploader: username,
+        format: isPhoto ? "jpg" : "mp4",
+        quality: "HD",
+        availableQualities: ["HD"],
+        platform: "tiktok"
+      }
+    };
+    console.log(JSON.stringify(payload));
+    return;
+  }
+
+  const isSpotify = lowerUrl.includes("spotify.com") || lowerUrl.includes("open.spotify.com");
 
   if (isSpotify) {
     try {
