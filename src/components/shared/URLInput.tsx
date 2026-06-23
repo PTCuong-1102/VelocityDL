@@ -16,6 +16,8 @@ export interface DownloadOptions {
   audioOnly: boolean;
   audioFormat?: string;
   audioQuality?: string;
+  selectedSubtitles?: string[];
+  embedSubs?: boolean;
 }
 
 export interface AnalyzedMetadata {
@@ -27,6 +29,7 @@ export interface AnalyzedMetadata {
   format: string;
   quality: string;
   availableQualities?: string[];
+  availableSubtitles?: { lang: string; name: string; isAuto: boolean; }[];
   platform: 'youtube' | 'tiktok' | 'facebook' | 'instagram' | 'spotify' | 'other';
   isPlaylist?: boolean;
   totalItems?: number;
@@ -42,10 +45,12 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
   const {
     urlInputUrl: url,
     setUrlInputUrl: setUrl,
-    urlInputAnalyzedInfo: analyzedInfo,
+    urlInputAnalyzedInfo,
     setUrlInputAnalyzedInfo: setAnalyzedInfo,
     resetUrlInput
   } = useUIStore();
+
+  const analyzedInfo = urlInputAnalyzedInfo as AnalyzedMetadata | null;
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +59,8 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
   const [downloadMode, setDownloadMode] = useState<'video' | 'audio'>('video');
   const [selectedHeight, setSelectedHeight] = useState<number>(1080);
   const [extractSubs, setExtractSubs] = useState(false);
+  const [selectedSubtitles, setSelectedSubtitles] = useState<string[]>([]);
+  const [embedSubs, setEmbedSubs] = useState<boolean>(true);
   const [selectedAudioFormat, setSelectedAudioFormat] = useState<string>('mp3');
   const [selectedAudioQuality, setSelectedAudioQuality] = useState<string>('320k');
 
@@ -64,6 +71,8 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
     setIsAnalyzing(true);
     setError(null);
     setAnalyzedInfo(null);
+    setSelectedSubtitles([]);
+    setEmbedSubs(true);
 
     try {
       // Fetch metadata using the Tauri command
@@ -90,7 +99,9 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
     const options: DownloadOptions = {
       maxHeight: downloadMode === 'video' ? selectedHeight : 0,
       audioOnly: downloadMode === 'audio',
-      extractSubs: extractSubs,
+      extractSubs: selectedSubtitles.length > 0 || extractSubs,
+      selectedSubtitles: selectedSubtitles,
+      embedSubs: embedSubs,
       audioFormat: downloadMode === 'audio' ? selectedAudioFormat : undefined,
       audioQuality: downloadMode === 'audio' ? selectedAudioQuality : undefined
     };
@@ -101,6 +112,8 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
   const handleReset = () => {
     resetUrlInput();
     setError(null);
+    setSelectedSubtitles([]);
+    setEmbedSubs(true);
   };
 
   const getPlatformName = (platform: string) => {
@@ -546,21 +559,83 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
           </div>
 
           {/* Subtitles Option */}
-          {analyzedInfo.platform === 'youtube' && (
-            <div 
-              style={{
-                backgroundColor: 'rgba(255,255,255,0.02)',
-                borderRadius: 'var(--radius-md)',
-                padding: '12px 16px',
-                border: '1px solid var(--outline-variant)'
-              }}
-            >
-              <Toggle 
-                label="Extract & Download Subtitles (if available)" 
-                checked={extractSubs}
-                onChange={(e) => setExtractSubs(e.target.checked)}
-              />
-            </div>
+          {downloadMode === 'video' && (
+            (analyzedInfo.availableSubtitles && analyzedInfo.availableSubtitles.length > 0) ? (
+              <div 
+                className="flex-col gap-sm"
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.02)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '16px',
+                  border: '1px solid var(--outline-variant)'
+                }}
+              >
+                <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>
+                    Subtitles / Phụ đề
+                  </span>
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                    <Toggle 
+                      label="Embed into video (Gộp vào video)" 
+                      checked={embedSubs}
+                      onChange={(e) => setEmbedSubs(e.target.checked)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex-row gap-xs" style={{ flexWrap: 'wrap', marginTop: '8px' }}>
+                  {analyzedInfo.availableSubtitles.map((sub) => {
+                    const isSelected = selectedSubtitles.includes(sub.lang);
+                    return (
+                      <button
+                        key={sub.lang}
+                        type="button"
+                        className={`btn ${isSelected ? 'btn-primary' : 'btn-ghost'}`}
+                        style={{
+                          padding: '6px 12px',
+                          height: 'auto',
+                          fontSize: '12px',
+                          borderRadius: '20px',
+                          border: isSelected ? 'none' : '1px solid var(--outline-variant)'
+                        }}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedSubtitles(selectedSubtitles.filter(lang => lang !== sub.lang));
+                          } else {
+                            setSelectedSubtitles([...selectedSubtitles, sub.lang]);
+                          }
+                        }}
+                      >
+                        {sub.name}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedSubtitles.length > 0 && (
+                  <div style={{ fontSize: '11px', color: 'var(--primary)', marginTop: '4px' }}>
+                    Selected {selectedSubtitles.length} subtitle language(s) to download {embedSubs ? 'and embed into the video' : ''}.
+                  </div>
+                )}
+              </div>
+            ) : (
+              analyzedInfo.platform === 'youtube' && (
+                <div 
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.02)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '12px 16px',
+                    border: '1px solid var(--outline-variant)'
+                  }}
+                >
+                  <Toggle 
+                    label="Extract & Download Subtitles (if available)" 
+                    checked={extractSubs}
+                    onChange={(e) => setExtractSubs(e.target.checked)}
+                  />
+                </div>
+              )
+            )
           )}
 
           {/* Actions footer */}

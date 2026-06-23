@@ -14,6 +14,8 @@ export interface DownloadOptions {
   audioOnly: boolean;
   audioFormat?: string;
   audioQuality?: string;
+  selectedSubtitles?: string[];
+  embedSubs?: boolean;
 }
 
 // Helper function to extract cookies using yt-dlp to a temp file
@@ -263,8 +265,17 @@ async function downloadYtdlp(
     args.push("--merge-output-format", "mp4");
   }
 
-  if (options.extractSubs) {
-    args.push("--write-subs", "--sub-langs", "all");
+  if (options.selectedSubtitles && options.selectedSubtitles.length > 0) {
+    args.push("--write-subs", "--write-auto-subs");
+    args.push("--sub-langs", options.selectedSubtitles.join(","));
+    if (options.embedSubs !== false) {
+      args.push("--embed-subs", "--compat-options", "no-keep-subs");
+    }
+  } else if (options.extractSubs) {
+    args.push("--write-subs", "--write-auto-subs", "--sub-langs", "all");
+    if (options.embedSubs !== false) {
+      args.push("--embed-subs", "--compat-options", "no-keep-subs");
+    }
   }
 
   args.push("-o", `${saveDir}/%(title)s.%(ext)s`);

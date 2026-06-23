@@ -70,6 +70,45 @@ function formatQuality(width: number, height: number): string {
   return "Unknown";
 }
 
+interface SubtitleInfo {
+  lang: string;
+  name: string;
+  isAuto: boolean;
+}
+
+function extractAvailableSubtitles(rawData: any): SubtitleInfo[] {
+  const subtitles: SubtitleInfo[] = [];
+
+  if (rawData.subtitles) {
+    for (const [lang, entries] of Object.entries(rawData.subtitles)) {
+      if (Array.isArray(entries) && entries.length > 0) {
+        subtitles.push({
+          lang,
+          name: entries[0].name || lang,
+          isAuto: false
+        });
+      }
+    }
+  }
+
+  if (rawData.automatic_captions) {
+    for (const [lang, entries] of Object.entries(rawData.automatic_captions)) {
+      // Avoid duplicate languages if manual already exists
+      if (!subtitles.some(s => s.lang === lang)) {
+        if (Array.isArray(entries) && entries.length > 0) {
+          subtitles.push({
+            lang,
+            name: (entries[0].name || lang) + " (Auto)",
+            isAuto: true
+          });
+        }
+      }
+    }
+  }
+
+  return subtitles;
+}
+
 export async function getVideoInfo(url: string): Promise<void> {
   const lowerUrl = url.toLowerCase();
 
@@ -385,6 +424,7 @@ export async function getVideoInfo(url: string): Promise<void> {
           quality,
           availableQualities,
           platform,
+          availableSubtitles: extractAvailableSubtitles(rawData),
         }
       };
     }
