@@ -110,7 +110,7 @@ export function useDownload() {
           speed: 0,
           eta: 0,
           format: options.audioOnly ? (options.audioFormat?.toUpperCase() || 'MP3') : 'MP4',
-          quality: options.audioOnly ? (options.audioQuality ? `${options.audioQuality.replace('k', '')}kbps` : '320kbps') : '1080p',
+          quality: options.audioOnly ? (options.audioQuality ? `${options.audioQuality.replace('k', '')}kbps` : '320kbps') : (options.maxHeight > 0 ? `${options.maxHeight}p` : 'Auto'),
           createdAt: Date.now(),
           outputPath: ''
         })) || []
@@ -129,7 +129,7 @@ export function useDownload() {
         speed: 0,
         eta: 0,
         format: options.audioOnly ? (options.audioFormat?.toUpperCase() || 'MP3') : 'MP4',
-        quality: options.audioOnly ? (options.audioQuality ? `${options.audioQuality.replace('k', '')}kbps` : '320kbps') : (prefetchedInfo?.quality || 'Auto'),
+        quality: options.audioOnly ? (options.audioQuality ? `${options.audioQuality.replace('k', '')}kbps` : '320kbps') : (options.maxHeight > 0 ? `${options.maxHeight}p` : (prefetchedInfo?.quality || 'Auto')),
         thumbnailUrl: prefetchedInfo?.thumbnailUrl,
         duration: prefetchedInfo?.duration,
         createdAt: Date.now(),

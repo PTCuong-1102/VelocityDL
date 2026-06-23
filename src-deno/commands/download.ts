@@ -261,7 +261,7 @@ async function downloadYtdlp(
     args.push("-f", "ba/b", "--extract-audio", "--audio-format", format, "--audio-quality", quality);
   } else {
     const height = options.maxHeight > 0 ? options.maxHeight : 1080;
-    args.push("-f", `bv*[height<=${height}]+ba/b[height<=${height}]`);
+    args.push("-f", `bv*[height<=${height}]+ba/b[height<=${height}]/best`);
     args.push("--merge-output-format", "mp4");
   }
 

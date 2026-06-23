@@ -52,6 +52,16 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
 
   const analyzedInfo = urlInputAnalyzedInfo as AnalyzedMetadata | null;
 
+  const subtitleList = (analyzedInfo?.availableSubtitles && analyzedInfo.availableSubtitles.length > 0)
+    ? analyzedInfo.availableSubtitles
+    : (analyzedInfo?.isPlaylist && analyzedInfo?.platform === 'youtube'
+        ? [
+            { lang: 'vi', name: 'Tiếng Việt', isAuto: true },
+            { lang: 'en', name: 'English', isAuto: true }
+          ]
+        : []
+      );
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -480,23 +490,32 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                       );
                     })
                   ) : (
-                    /* Fallback when no qualities detected */
-                    <>
-                      <button
-                        className={`btn ${selectedHeight === 1080 ? 'btn-primary' : 'btn-ghost'}`}
-                        style={{ flexGrow: 1, height: '40px', fontSize: '13px' }}
-                        onClick={() => setSelectedHeight(1080)}
-                      >
-                        1080p (FHD)
-                      </button>
-                      <button
-                        className={`btn ${selectedHeight === 2160 ? 'btn-primary' : 'btn-ghost'}`}
-                        style={{ flexGrow: 1, height: '40px', fontSize: '13px' }}
-                        onClick={() => setSelectedHeight(2160)}
-                      >
-                        4K (Ultra HD)
-                      </button>
-                    </>
+                    /* Fallback when no qualities detected (e.g. Playlists) */
+                    <div className="flex-row gap-xs" style={{ flexWrap: 'wrap', width: '100%' }}>
+                      {[
+                        { height: 360, label: '360p' },
+                        { height: 480, label: '480p' },
+                        { height: 720, label: '720p (HD)' },
+                        { height: 1080, label: '1080p (FHD)' },
+                        { height: 1440, label: '1440p (2K)' },
+                        { height: 2160, label: '2160p (4K)' }
+                      ].map((q) => (
+                        <button
+                          key={q.height}
+                          type="button"
+                          className={`btn ${selectedHeight === q.height ? 'btn-primary' : 'btn-ghost'}`}
+                          style={{ 
+                            minWidth: '80px',
+                            height: '40px', 
+                            fontSize: '13px',
+                            flex: '1 1 auto'
+                          }}
+                          onClick={() => setSelectedHeight(q.height)}
+                        >
+                          {q.label}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               ) : (
@@ -560,7 +579,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
 
           {/* Subtitles Option */}
           {downloadMode === 'video' && (
-            (analyzedInfo.availableSubtitles && analyzedInfo.availableSubtitles.length > 0) ? (
+            subtitleList.length > 0 ? (
               <div 
                 className="flex-col gap-sm"
                 style={{
@@ -584,7 +603,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                 </div>
 
                 <div className="flex-row gap-xs" style={{ flexWrap: 'wrap', marginTop: '8px' }}>
-                  {analyzedInfo.availableSubtitles.map((sub) => {
+                  {subtitleList.map((sub) => {
                     const isSelected = selectedSubtitles.includes(sub.lang);
                     return (
                       <button
@@ -619,7 +638,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                 )}
               </div>
             ) : (
-              analyzedInfo.platform === 'youtube' && (
+              analyzedInfo?.platform === 'youtube' && (
                 <div 
                   style={{
                     backgroundColor: 'rgba(255,255,255,0.02)',
