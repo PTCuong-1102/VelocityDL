@@ -13,7 +13,7 @@ export const SettingsPage: React.FC = () => {
   const { settings, updateSetting, resetDefaults } = useSettingsStore();
 
   // App Update States
-  const [currentVersion, setCurrentVersion] = useState('0.2.1');
+  const [currentVersion, setCurrentVersion] = useState('0.3.5');
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'no-update' | 'downloading' | 'ready' | 'error'>('idle');
   const [updateInfo, setUpdateInfo] = useState<{
     latestVersion: string;
