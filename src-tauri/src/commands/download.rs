@@ -114,7 +114,18 @@ pub async fn get_video_info(app: AppHandle, url: String) -> Result<Value, String
     while let Some(event) = rx.recv().await {
         match event {
             CommandEvent::Stdout(line_bytes) => {
-                output_str.push_str(&String::from_utf8_lossy(&line_bytes));
+                let text = String::from_utf8_lossy(&line_bytes);
+                output_str.push_str(&text);
+                
+                // Parse on the fly to emit update progress to frontend
+                for line in text.lines() {
+                    if let Ok(json_val) = serde_json::from_str::<Value>(line) {
+                        let status_opt = json_val.get("status").and_then(|s| s.as_str());
+                        if status_opt == Some("updating") || status_opt == Some("ready") {
+                            let _ = app.emit("info-progress", json_val);
+                        }
+                    }
+                }
             }
             CommandEvent::Stderr(line_bytes) => {
                 let err_line = String::from_utf8_lossy(&line_bytes);

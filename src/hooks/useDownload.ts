@@ -19,8 +19,27 @@ export function useDownload() {
   const { addToast } = useToastStore();
 
   // Listen for real-time progress events from Tauri
+  useTauriEvent<any>('info-progress', (event) => {
+    const payload = event.payload;
+    if (payload.status === 'updating' && payload.message) {
+      addToast('info', payload.message);
+    } else if (payload.status === 'ready' && payload.message) {
+      addToast('success', payload.message);
+    }
+  });
+
   useTauriEvent<any>('download-progress', (event) => {
     const payload = event.payload;
+
+    if (payload.status === 'updating' && payload.message) {
+      addToast('info', payload.message);
+      return;
+    }
+    
+    if (payload.status === 'ready' && payload.message) {
+      addToast('success', payload.message);
+      return;
+    }
 
     // Track completed items before updating state to detect when a video completes in a playlist
     const beforeItem = useDownloadStore.getState().downloads.find((d) => d.id === payload.id);
@@ -140,7 +159,11 @@ export function useDownload() {
     if (prefetchedInfo) {
       addToast('info', `Starting download: ${prefetchedInfo.title || url}`);
       try {
-        const saveDir = settings.storage.defaultDownloadPath || '.';
+        let saveDir = settings.storage.defaultDownloadPath || '.';
+        if (prefetchedInfo.isPlaylist && settings.storage.createSubfolders && prefetchedInfo.title) {
+          const safeTitle = prefetchedInfo.title.replace(/[<>:"\/\\|?*]+/g, '_').trim() || 'Playlist';
+          saveDir = `${saveDir}/${safeTitle}`;
+        }
         await invoke('start_download', { id, url, saveDir, options });
       } catch (err) {
         addToast('error', `Failed to start download: ${String(err)}`);
@@ -183,7 +206,11 @@ export function useDownload() {
       addToast('info', `Starting download: ${info.title || url}`);
 
       // 2. Trigger the download process in Tauri
-      const saveDir = settings.storage.defaultDownloadPath || '.';
+      let saveDir = settings.storage.defaultDownloadPath || '.';
+      if (info.isPlaylist && settings.storage.createSubfolders && info.title) {
+        const safeTitle = info.title.replace(/[<>:"\/\\|?*]+/g, '_').trim() || 'Playlist';
+        saveDir = `${saveDir}/${safeTitle}`;
+      }
       await invoke('start_download', { id, url, saveDir, options });
     } catch (err) {
       addToast('error', `Failed to fetch URL info: ${String(err)}`);
@@ -217,7 +244,12 @@ export function useDownload() {
       storeResume(id);
       
       // Re-trigger start_download with same URL and settings
-      const saveDir = settings.storage.defaultDownloadPath || '.';
+      let saveDir = settings.storage.defaultDownloadPath || '.';
+      if (item.isPlaylist && settings.storage.createSubfolders && item.title) {
+        const safeTitle = item.title.replace(/[<>:"\/\\|?*]+/g, '_').trim() || 'Playlist';
+        saveDir = `${saveDir}/${safeTitle}`;
+      }
+
       // Extract height from quality string (e.g. "1920x1080" → 1080, "720p" → 720)
       const qualityMatch = item.quality.match(/(\d+)(?:p|$)/i) || item.quality.match(/x(\d+)/);
       const maxHeight = qualityMatch ? parseInt(qualityMatch[1]) : 1080;
