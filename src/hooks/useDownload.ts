@@ -1,5 +1,4 @@
 import { useDownloadStore } from '../stores/downloadStore';
-import { useSettingsStore } from '../stores/settingsStore';
 import { useTauriEvent } from './useTauriEvent';
 import { invoke } from '@tauri-apps/api/core';
 import { DownloadOptions } from '../components/shared/URLInput';
@@ -15,7 +14,6 @@ export function useDownload() {
     resumeDownload: storeResume, 
     cancelDownload: storeCancel 
   } = useDownloadStore();
-  const { settings } = useSettingsStore();
   const { addToast } = useToastStore();
 
   // Listen for real-time progress events from Tauri
