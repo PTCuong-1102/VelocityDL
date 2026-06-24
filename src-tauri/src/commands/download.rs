@@ -53,10 +53,24 @@ pub fn start_download(
                 CommandEvent::Terminated(payload) => {
                     println!("[Sidecar Terminated] exit code: {:?}", payload.code);
                     
+                    let mut was_active = false;
                     // Remove from active list
                     if let Some(state_accessor) = app_clone.try_state::<AppState>() {
                         let mut active = state_accessor.active_downloads.lock().unwrap();
-                        active.remove(&id_clone);
+                        was_active = active.remove(&id_clone).is_some();
+                    }
+
+                    if was_active && payload.code != Some(0) {
+                        let _ = app_clone.emit("download-progress", serde_json::json!({
+                            "id": id_clone,
+                            "status": "error",
+                            "error": format!("Sidecar process terminated unexpectedly with code {:?}", payload.code),
+                            "progress": 0,
+                            "speed": 0,
+                            "eta": 0,
+                            "downloadedBytes": 0,
+                            "totalBytes": 0
+                        }));
                     }
                 }
                 _ => {}

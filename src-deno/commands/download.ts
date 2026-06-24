@@ -168,6 +168,17 @@ async function downloadSpotify(
 
   const decoder = new TextDecoder();
   const stdoutReader = child.stdout.getReader();
+  const stderrReader = child.stderr.getReader();
+  
+  let stderrOutput = "";
+  const stderrPromise = (async () => {
+    while (true) {
+      const { value, done } = await stderrReader.read();
+      if (done) break;
+      const text = decoder.decode(value, { stream: true });
+      stderrOutput = (stderrOutput + text).slice(-4096);
+    }
+  })();
   
   let buffer = "";
   let playlistIndex = 1;
@@ -225,6 +236,7 @@ async function downloadSpotify(
   }
 
   const status = await child.status;
+  await stderrPromise;
 
   if (status.success) {
     console.log(JSON.stringify({
@@ -234,9 +246,7 @@ async function downloadSpotify(
       outputPath: outputPath || undefined
     }));
   } else {
-    const errorBytes = await child.stderr.getReader().read();
-    const errorStr = errorBytes.value ? decoder.decode(errorBytes.value) : "Unknown error during Spotify download";
-    throw new Error(errorStr);
+    throw new Error(stderrOutput || "Unknown error during Spotify download");
   }
 }
 
@@ -309,6 +319,18 @@ async function downloadYtdlp(
 
   const decoder = new TextDecoder();
   const stdoutReader = child.stdout.getReader();
+  const stderrReader = child.stderr.getReader();
+  
+  let stderrOutput = "";
+  const stderrPromise = (async () => {
+    while (true) {
+      const { value, done } = await stderrReader.read();
+      if (done) break;
+      const text = decoder.decode(value, { stream: true });
+      stderrOutput = (stderrOutput + text).slice(-4096);
+    }
+  })();
+
   let buffer = "";
   let lastEmitTime = 0;
   let outputPath = "";
@@ -396,6 +418,7 @@ async function downloadYtdlp(
   }
 
   const status = await child.status;
+  await stderrPromise;
   
   if (status.success) {
     console.log(JSON.stringify({
@@ -405,9 +428,7 @@ async function downloadYtdlp(
       outputPath: outputPath || undefined
     }));
   } else {
-    const errorBytes = await child.stderr.getReader().read();
-    const errorStr = errorBytes.value ? decoder.decode(errorBytes.value) : "Unknown error during yt-dlp download";
-    throw new Error(errorStr);
+    throw new Error(stderrOutput || "Unknown error during yt-dlp download");
   }
 }
 
@@ -461,6 +482,18 @@ async function downloadInstagramStory(
   const child = command.spawn();
   const decoder = new TextDecoder();
   const stdoutReader = child.stdout.getReader();
+  const stderrReader = child.stderr.getReader();
+  
+  let stderrOutput = "";
+  const stderrPromise = (async () => {
+    while (true) {
+      const { value, done } = await stderrReader.read();
+      if (done) break;
+      const text = decoder.decode(value, { stream: true });
+      stderrOutput = (stderrOutput + text).slice(-4096);
+    }
+  })();
+
   let buffer = "";
   let progress = 10;
   let outputPath = "";
@@ -497,6 +530,7 @@ async function downloadInstagramStory(
   }
 
   const status = await child.status;
+  await stderrPromise;
 
   if (status.success) {
     console.log(JSON.stringify({
@@ -506,9 +540,7 @@ async function downloadInstagramStory(
       outputPath: outputPath || undefined
     }));
   } else {
-    const errorBytes = await child.stderr.getReader().read();
-    const errorStr = errorBytes.value ? decoder.decode(errorBytes.value) : "Instagram Story requires authentication or login cookies.";
-    throw new Error(errorStr);
+    throw new Error(stderrOutput || "Instagram Story requires authentication or login cookies.");
   }
 }
 
@@ -551,6 +583,18 @@ async function downloadGallerydl(
   const child = command.spawn();
   const decoder = new TextDecoder();
   const stdoutReader = child.stdout.getReader();
+  const stderrReader = child.stderr.getReader();
+  
+  let stderrOutput = "";
+  const stderrPromise = (async () => {
+    while (true) {
+      const { value, done } = await stderrReader.read();
+      if (done) break;
+      const text = decoder.decode(value, { stream: true });
+      stderrOutput = (stderrOutput + text).slice(-4096);
+    }
+  })();
+
   let buffer = "";
   let progress = 10;
   let outputPath = "";
@@ -582,6 +626,7 @@ async function downloadGallerydl(
   }
 
   const status = await child.status;
+  await stderrPromise;
 
   if (status.success) {
     console.log(JSON.stringify({
@@ -591,8 +636,6 @@ async function downloadGallerydl(
       outputPath: outputPath || undefined
     }));
   } else {
-    const errorBytes = await child.stderr.getReader().read();
-    const errorStr = errorBytes.value ? decoder.decode(errorBytes.value) : `Failed during ${platformLabel} download`;
-    throw new Error(errorStr);
+    throw new Error(stderrOutput || `Failed during ${platformLabel} download`);
   }
 }
