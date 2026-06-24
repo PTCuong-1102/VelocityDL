@@ -4,14 +4,16 @@ import AppShell from './components/layout/AppShell';
 import DashboardPage from './pages/DashboardPage';
 import QueuePage from './pages/QueuePage';
 import FinishedPage from './pages/FinishedPage';
-import ScheduledPage from './pages/ScheduledPage';
-import BrowserPage from './pages/BrowserPage';
 import SettingsPage from './pages/SettingsPage';
 import useSettingsStore from './stores/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
 
 export const App: React.FC = () => {
-  const { setAllSettings } = useSettingsStore();
+  const { settings, setAllSettings } = useSettingsStore();
+
+  useEffect(() => {
+    document.documentElement.className = `theme-${settings.general.theme}`;
+  }, [settings.general.theme]);
 
   useEffect(() => {
     // Load saved settings from Tauri config on app mount
@@ -36,8 +38,6 @@ export const App: React.FC = () => {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/finished" element={<FinishedPage />} />
-          <Route path="/scheduled" element={<ScheduledPage />} />
-          <Route path="/browser" element={<BrowserPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </AppShell>

@@ -2,6 +2,7 @@ import { ensureYtdlpInstalled, ensureFfmpegInstalled, ensureSpotdlInstalled, ens
 import { getVideoInfo } from "./commands/info.ts";
 import { downloadMedia, DownloadOptions } from "./commands/download.ts";
 import { checkAppUpdate, downloadAppUpdate } from "./commands/appUpdate.ts";
+import { getSettings } from "./utils/paths.ts";
 
 async function main() {
   const command = Deno.args[0];
@@ -22,6 +23,22 @@ async function main() {
       await ensureSpotdlInstalled();
       await ensureGallerydlInstalled();
       await ensureInstaloaderInstalled();
+    }
+
+    // Apply global proxy settings if configured
+    const settings = await getSettings();
+    const proxyAddress = settings?.engine?.proxyAddress;
+    const proxyType = settings?.engine?.proxyType;
+    
+    if (proxyAddress) {
+      const prefix = proxyType === "SOCKS5" ? "socks5://" : "http://";
+      let fullProxy = proxyAddress;
+      if (!proxyAddress.startsWith("http://") && !proxyAddress.startsWith("socks5://") && !proxyAddress.startsWith("https://")) {
+        fullProxy = `${prefix}${proxyAddress}`;
+      }
+      Deno.env.set("HTTP_PROXY", fullProxy);
+      Deno.env.set("HTTPS_PROXY", fullProxy);
+      Deno.env.set("ALL_PROXY", fullProxy);
     }
 
     // 2. Command Router

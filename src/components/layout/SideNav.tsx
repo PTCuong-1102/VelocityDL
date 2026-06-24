@@ -10,8 +10,6 @@ export const SideNav: React.FC = () => {
     { path: '/', label: 'Dashboard', icon: 'dashboard' },
     { path: '/queue', label: 'Download Queue', icon: 'download' },
     { path: '/finished', label: 'Finished', icon: 'check_circle' },
-    { path: '/scheduled', label: 'Scheduled', icon: 'schedule' },
-    { path: '/browser', label: 'Browser', icon: 'language' },
     { path: '/settings', label: 'Settings', icon: 'settings' },
   ];
 

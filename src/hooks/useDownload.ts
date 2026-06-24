@@ -139,7 +139,7 @@ export function useDownload() {
         id,
         url,
         title: prefetchedInfo?.title || 'Analyzing video URL...',
-        status: 'queued',
+        status: prefetchedInfo ? 'queued' : 'analyzing',
         platform: prefetchedInfo?.platform || 'other',
         mediaType: options.audioOnly ? 'audio' : 'video',
         progress: 0,
@@ -159,12 +159,8 @@ export function useDownload() {
     if (prefetchedInfo) {
       addToast('info', `Starting download: ${prefetchedInfo.title || url}`);
       try {
-        let saveDir = settings.storage.defaultDownloadPath || '.';
-        if (prefetchedInfo.isPlaylist && settings.storage.createSubfolders && prefetchedInfo.title) {
-          const safeTitle = prefetchedInfo.title.replace(/[<>:"\/\\|?*]+/g, '_').trim() || 'Playlist';
-          saveDir = `${saveDir}/${safeTitle}`;
-        }
-        await invoke('start_download', { id, url, saveDir, options });
+        // Replaced direct invoke with queue manager reliance
+        // The item is already marked as 'queued' in the store.
       } catch (err) {
         addToast('error', `Failed to start download: ${String(err)}`);
         updateProgress({
@@ -205,13 +201,12 @@ export function useDownload() {
 
       addToast('info', `Starting download: ${info.title || url}`);
 
-      // 2. Trigger the download process in Tauri
-      let saveDir = settings.storage.defaultDownloadPath || '.';
-      if (info.isPlaylist && settings.storage.createSubfolders && info.title) {
-        const safeTitle = info.title.replace(/[<>:"\/\\|?*]+/g, '_').trim() || 'Playlist';
-        saveDir = `${saveDir}/${safeTitle}`;
-      }
-      await invoke('start_download', { id, url, saveDir, options });
+      // 2. Mark as queued so Queue Manager can pick it up
+      useDownloadStore.setState((state) => ({
+        downloads: state.downloads.map((d) => 
+          d.id === id ? { ...d, status: 'queued' } : d
+        )
+      }));
     } catch (err) {
       addToast('error', `Failed to fetch URL info: ${String(err)}`);
       updateProgress({
@@ -244,25 +239,10 @@ export function useDownload() {
       storeResume(id);
       
       // Re-trigger start_download with same URL and settings
-      let saveDir = settings.storage.defaultDownloadPath || '.';
-      if (item.isPlaylist && settings.storage.createSubfolders && item.title) {
-        const safeTitle = item.title.replace(/[<>:"\/\\|?*]+/g, '_').trim() || 'Playlist';
-        saveDir = `${saveDir}/${safeTitle}`;
-      }
+      // Replaced with storeResume which sets status to 'queued'
+      // The Queue Manager will pick it up automatically
 
-      // Extract height from quality string (e.g. "1920x1080" → 1080, "720p" → 720)
-      const qualityMatch = item.quality.match(/(\d+)(?:p|$)/i) || item.quality.match(/x(\d+)/);
-      const maxHeight = qualityMatch ? parseInt(qualityMatch[1]) : 1080;
-      const isAudio = item.mediaType === 'audio';
-      const options = {
-        maxHeight: isAudio ? 0 : maxHeight,
-        extractSubs: false,
-        audioOnly: isAudio,
-        audioFormat: isAudio ? item.format.toLowerCase() : undefined,
-        audioQuality: isAudio ? (item.quality.includes('kbps') ? item.quality.replace('kbps', 'k') : '320k') : undefined
-      };
-
-      await invoke('start_download', { id, url: item.url, saveDir, options });
+      // Queue Manager takes care of the invoke
     } catch (err) {
       console.error('Failed to resume download:', err);
       updateProgress({

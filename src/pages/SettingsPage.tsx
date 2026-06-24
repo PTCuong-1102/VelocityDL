@@ -365,19 +365,6 @@ export const SettingsPage: React.FC = () => {
                   </button>
                 </div>
               </div>
-
-              <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
-
-              {/* Launch on boot toggle */}
-              <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <div className="flex-col" style={{ gap: '4px' }}>
-                  <span style={{ fontWeight: 500, fontSize: '13px' }}>Run on Startup</span>
-                </div>
-                <Toggle 
-                  checked={settings.general.launchOnBoot}
-                  onChange={(e) => updateSetting('general', 'launchOnBoot', e.target.checked)}
-                />
-              </div>
             </div>
           </GlassPanel>
 

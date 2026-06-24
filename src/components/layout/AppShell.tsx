@@ -2,12 +2,15 @@ import React from 'react';
 import SideNav from './SideNav';
 import TopBar from './TopBar';
 import ToastContainer from '../ui/Toast';
+import { useQueueManager } from '../../hooks/useQueueManager';
 
 interface AppShellProps {
   children: React.ReactNode;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({ children }) => {
+  // Initialize the global download queue manager
+  useQueueManager();
 
   return (
     <div 
