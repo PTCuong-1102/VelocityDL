@@ -57,8 +57,8 @@ VelocityDL uses a **3-layer architecture** for maximum performance and security:
                     │  Child process (Sidecar)
 ┌───────────────────▼─────────────────────────────────┐
 │               Deno Engine Sidecar                    │
-│    Commands: info · download · update                │
-│    yt-dlp management + SHA-256 verification          │
+│    Commands: info · download · update · appUpdate    │
+│    yt-dlp management + app updates + SHA-256         │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -127,7 +127,8 @@ VelocityDL/
 │   │   ├── commands/
 │   │   │   ├── download.rs     # start/pause/cancel/get_video_info
 │   │   │   ├── settings.rs     # load/save settings, browse directory
-│   │   │   └── filesystem.rs   # open file/folder in OS
+│   │   │   ├── filesystem.rs   # open file/folder in OS
+│   │   │   └── update.rs       # app auto-update checking & downloading
 │   │   ├── state.rs            # AppState (active downloads map)
 │   │   └── lib.rs              # Tauri builder + window close cleanup
 │   ├── binaries/               # Compiled Deno sidecar binary
@@ -138,10 +139,11 @@ VelocityDL/
 │   ├── commands/
 │   │   ├── download.ts         # yt-dlp download with real-time streaming
 │   │   ├── info.ts             # yt-dlp metadata extraction
-│   │   └── update.ts           # yt-dlp auto-install + SHA-256 verification
+│   │   ├── update.ts           # yt-dlp auto-install + SHA-256 verification
+│   │   └── appUpdate.ts        # checks and downloads app updates
 │   ├── utils/
 │   │   └── paths.ts            # Cross-platform binary paths
-│   └── main.ts                 # CLI command router (info | download | update)
+│   └── main.ts                 # CLI command router (info | download | update | appUpdate)
 │
 ├── .vscode/
 │   ├── settings.json           # Deno LS for src-deno, TypeScript LS for src/
@@ -216,9 +218,9 @@ VelocityDL stores its settings at:
 
 | OS | Path |
 |----|------|
-| Windows | `%APPDATA%\com.ptcmh.tauri-app\settings.json` |
-| macOS | `~/Library/Application Support/com.ptcmh.tauri-app/settings.json` |
-| Linux | `~/.config/com.ptcmh.tauri-app/settings.json` |
+| Windows | `%APPDATA%\com.ptcmh.velocitydl\settings.json` |
+| macOS | `~/Library/Application Support/com.ptcmh.velocitydl/settings.json` |
+| Linux | `~/.config/com.ptcmh.velocitydl/settings.json` |
 
 Settings include: default download path, concurrent threads, proxy config, theme, and yt-dlp auto-update preference.
 
