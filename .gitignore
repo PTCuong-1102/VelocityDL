@@ -16,6 +16,9 @@ dist-ssr
 *.local
 *.exe
 *.msi
+*.deb
+*.rpm
+*.AppImage
 
 # Editor directories and files
 .vscode/*
