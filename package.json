@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "build:deno": "deno compile --allow-all --output src-tauri/binaries/deno-engine-x86_64-pc-windows-msvc.exe src-deno/main.ts",
+    "build:deno:win": "deno compile --allow-all --target x86_64-pc-windows-msvc --output src-tauri/binaries/deno-engine-x86_64-pc-windows-msvc.exe src-deno/main.ts",
+    "build:deno:linux": "deno compile --allow-all --target x86_64-unknown-linux-gnu --output src-tauri/binaries/deno-engine-x86_64-unknown-linux-gnu src-deno/main.ts",
+    "build:deno": "npm run build:deno:win && npm run build:deno:linux",
     "check:deno": "deno check src-deno/main.ts",
     "build:all": "npm run build:deno && npm run build"
   },

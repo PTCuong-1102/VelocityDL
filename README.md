@@ -164,6 +164,9 @@ VelocityDL/
 | [Deno](https://deno.com/) | ≥ 2.0 | `irm https://deno.land/install.ps1 \| iex` (Windows) |
 | [Tauri CLI prerequisites](https://tauri.app/start/prerequisites/) | — | See Tauri docs for your OS |
 
+> **Linux Note:** To build `.deb`, `.rpm`, and `.AppImage`, ensure you have the required build dependencies:
+> `sudo apt update && sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev rpm`
+
 ### Installation
 
 > [!IMPORTANT]
