@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/logo.png" alt="VelocityDL Logo" width="80" height="80" />
+<img src="app_icon_fixed.png" alt="VelocityDL Logo" width="80" height="80" />
 
 # VelocityDL
 
