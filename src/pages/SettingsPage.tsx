@@ -15,7 +15,7 @@ export const SettingsPage: React.FC = () => {
   const { addToast } = useToastStore();
 
   // App Update States
-  const [currentVersion, setCurrentVersion] = useState('0.3.5');
+  const [currentVersion, setCurrentVersion] = useState('0.4.0');
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'no-update' | 'downloading' | 'ready' | 'error'>('idle');
   const [updateInfo, setUpdateInfo] = useState<{
     latestVersion: string;
