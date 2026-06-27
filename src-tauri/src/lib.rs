@@ -35,12 +35,13 @@ pub fn run() {
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if let Some(state) = window.try_state::<AppState>() {
-                    let mut active = state.active_downloads.lock().unwrap();
-                    for (id, child) in active.drain() {
-                        if let Err(e) = child.kill() {
-                            eprintln!("[Cleanup] Failed to kill download process {}: {}", id, e);
-                        } else {
-                            println!("[Cleanup] Killed download process: {}", id);
+                    if let Ok(mut active) = state.active_downloads.lock() {
+                        for (id, child) in active.drain() {
+                            if let Err(e) = child.kill() {
+                                eprintln!("[Cleanup] Failed to kill download process {}: {}", id, e);
+                            } else {
+                                println!("[Cleanup] Killed download process: {}", id);
+                            }
                         }
                     }
                 }

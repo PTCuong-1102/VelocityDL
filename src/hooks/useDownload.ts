@@ -2,7 +2,7 @@ import { useDownloadStore } from '../stores/downloadStore';
 import { useTauriEvent } from './useTauriEvent';
 import { invoke } from '@tauri-apps/api/core';
 import { DownloadOptions } from '../components/shared/URLInput';
-import { Platform } from '../types/download';
+import { Platform, PlaylistItem, isPlaylistItem, generateDownloadId } from '../types/download';
 import useToastStore from '../stores/toastStore';
 
 export function useDownload() {
@@ -45,14 +45,14 @@ export function useDownload() {
     updateProgress(payload);
 
     // If it's a playlist, detect child video completion by comparing completedItems
-    if (beforeItem && beforeItem.isPlaylist && payload.playlistIndex != null) {
-      const beforeCompleted = (beforeItem as any).completedItems || 0;
+    if (beforeItem && isPlaylistItem(beforeItem) && payload.playlistIndex != null) {
+      const beforeCompleted = beforeItem.completedItems || 0;
       const afterCompleted = payload.playlistIndex - 1;
 
       if (afterCompleted > beforeCompleted) {
         // Show success notification for each child video completed in this progress step
         for (let i = beforeCompleted; i < afterCompleted; i++) {
-          const child = (beforeItem as any).children?.[i];
+          const child = beforeItem.children?.[i];
           const childTitle = child?.title || `Video #${i + 1}`;
           addToast('success', `✓ Completed: ${childTitle}`);
         }
@@ -63,13 +63,13 @@ export function useDownload() {
     if (payload.status === 'finished') {
       const item = useDownloadStore.getState().downloads.find((d) => d.id === payload.id);
       if (item) {
-        if (item.isPlaylist) {
+        if (isPlaylistItem(item)) {
           // Notify the last video in the playlist if it wasn't notified yet
-          const beforeCompleted = (item as any).completedItems || 0;
-          const totalItems = (item as any).totalItems || 0;
+          const beforeCompleted = item.completedItems || 0;
+          const totalItems = item.totalItems || 0;
           if (totalItems > beforeCompleted) {
             for (let i = beforeCompleted; i < totalItems; i++) {
-              const child = (item as any).children?.[i];
+              const child = item.children?.[i];
               const childTitle = child?.title || `Video #${i + 1}`;
               addToast('success', `✓ Completed: ${childTitle}`);
             }
@@ -88,11 +88,11 @@ export function useDownload() {
   });
 
   const startDownload = async (url: string, options: DownloadOptions, prefetchedInfo?: any) => {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = generateDownloadId();
     
     // Add default queued item in UI
     if (prefetchedInfo?.isPlaylist) {
-      addDownload({
+      const playlistItem: PlaylistItem = {
         id,
         url,
         title: prefetchedInfo.title || 'Analyzing playlist URL...',
@@ -118,7 +118,7 @@ export function useDownload() {
           id: `${id}-child-${index}`,
           url: entry.url,
           title: entry.title,
-          status: 'queued',
+          status: 'queued' as const,
           platform: prefetchedInfo.platform || 'other',
           mediaType: options.audioOnly ? 'audio' : 'video',
           progress: 0,
@@ -131,7 +131,8 @@ export function useDownload() {
           createdAt: Date.now(),
           outputPath: ''
         })) || []
-      } as any);
+      };
+      addDownload(playlistItem);
     } else {
       addDownload({
         id,
@@ -156,22 +157,7 @@ export function useDownload() {
 
     if (prefetchedInfo) {
       addToast('info', `Starting download: ${prefetchedInfo.title || url}`);
-      try {
-        // Replaced direct invoke with queue manager reliance
-        // The item is already marked as 'queued' in the store.
-      } catch (err) {
-        addToast('error', `Failed to start download: ${String(err)}`);
-        updateProgress({
-          id,
-          progress: 0,
-          downloadedBytes: 0,
-          totalBytes: 0,
-          speed: 0,
-          eta: 0,
-          status: 'error',
-          error: String(err)
-        });
-      }
+      // Item is already marked as 'queued'. Queue Manager will pick it up.
       return;
     }
 
@@ -202,7 +188,7 @@ export function useDownload() {
       // 2. Mark as queued so Queue Manager can pick it up
       useDownloadStore.setState((state) => ({
         downloads: state.downloads.map((d) => 
-          d.id === id ? { ...d, status: 'queued' } : d
+          d.id === id ? { ...d, status: 'queued' as const } : d
         )
       }));
     } catch (err) {
@@ -235,12 +221,7 @@ export function useDownload() {
 
     try {
       storeResume(id);
-      
-      // Re-trigger start_download with same URL and settings
-      // Replaced with storeResume which sets status to 'queued'
-      // The Queue Manager will pick it up automatically
-
-      // Queue Manager takes care of the invoke
+      // Queue Manager will pick it up and call start_download with the same URL
     } catch (err) {
       console.error('Failed to resume download:', err);
       updateProgress({
@@ -257,8 +238,24 @@ export function useDownload() {
   };
 
   const cancelDownload = async (id: string) => {
+    const item = useDownloadStore.getState().downloads.find((d) => d.id === id);
+    const filePaths: string[] = [];
+
+    if (item) {
+      if (isPlaylistItem(item)) {
+        if (item.outputPath) filePaths.push(item.outputPath);
+        if (item.children) {
+          item.children.forEach((child) => {
+            if (child.outputPath) filePaths.push(child.outputPath);
+          });
+        }
+      } else {
+        if (item.outputPath) filePaths.push(item.outputPath);
+      }
+    }
+
     try {
-      await invoke('cancel_download', { id });
+      await invoke('cancel_download', { id, filePaths });
       storeCancel(id);
     } catch (err) {
       console.error('Failed to cancel download:', err);

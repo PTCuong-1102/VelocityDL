@@ -1,4 +1,4 @@
-import * as path from "https://deno.land/std@0.224.0/path/mod.ts";
+import * as path from "jsr:@std/path";
 
 export async function checkAppUpdate(currentVersion: string): Promise<void> {
   const repo = "PTCuong-1102/VelocityDL";
@@ -34,11 +34,24 @@ export async function checkAppUpdate(currentVersion: string): Promise<void> {
 
     const updateAvailable = compareVersions(latestVersion, currentVersion) > 0;
 
-    // Find installer assets (prefer .exe, fallback to .msi)
+    // Find installer assets for current platform
     const assets = releaseData.assets || [];
-    const exeAsset = assets.find((a: any) => a.name.endsWith(".exe"));
-    const msiAsset = assets.find((a: any) => a.name.endsWith(".msi"));
-    const asset = exeAsset || msiAsset;
+    const os = Deno.build.os;
+    let asset = null;
+
+    if (os === "windows") {
+      // Prefer .exe (NSIS), fallback to .msi
+      asset = assets.find((a: any) => a.name.endsWith(".exe")) ||
+              assets.find((a: any) => a.name.endsWith(".msi"));
+    } else if (os === "linux") {
+      // Prefer .deb, fallback to .AppImage, then .rpm
+      asset = assets.find((a: any) => a.name.endsWith(".deb")) ||
+              assets.find((a: any) => a.name.endsWith(".AppImage")) ||
+              assets.find((a: any) => a.name.endsWith(".rpm"));
+    } else if (os === "darwin") {
+      // macOS: .dmg
+      asset = assets.find((a: any) => a.name.endsWith(".dmg"));
+    }
 
     console.log(JSON.stringify({
       status: "success",

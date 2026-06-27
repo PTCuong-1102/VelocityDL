@@ -47,7 +47,9 @@ pub fn load_settings(app: tauri::AppHandle) -> Result<Value, String> {
                 "concurrentThreads": 3,
                 "proxyType": "HTTP",
                 "proxyAddress": "",
-                "autoUpdateYtdlp": true
+                "autoUpdateYtdlp": true,
+                "cookieSource": "none",
+                "cookieFilePath": ""
             },
             "storage": {
                 "defaultDownloadPath": default_download,

@@ -87,6 +87,6 @@ pub fn start_app_update_download(
 }
 
 #[tauri::command]
-pub fn exit_app() {
-    std::process::exit(0);
+pub fn exit_app(app: AppHandle) {
+    app.exit(0);
 }

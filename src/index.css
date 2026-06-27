@@ -508,3 +508,34 @@ input[type="checkbox"]:checked + .switch-control .switch-thumb {
   direction: ltr;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Settings Page responsive grid */
+.settings-main-col {
+  grid-column: span 8;
+}
+
+.settings-aside-col {
+  grid-column: span 4;
+}
+
+@media (max-width: 900px) {
+  .settings-main-col,
+  .settings-aside-col {
+    grid-column: span 12;
+  }
+}
+
+/* Status dot: analyzing */
+.status-dot.analyzing {
+  background-color: var(--primary);
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

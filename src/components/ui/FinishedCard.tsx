@@ -1,11 +1,11 @@
 import React from 'react';
-import { DownloadItem } from '../../types/download';
+import { AnyDownloadItem } from '../../types/download';
 import { formatBytes } from '../../utils/format';
 import { getPlatformColor } from '../../utils/platform';
 import PlatformIcon from '../shared/PlatformIcon';
 
 interface FinishedCardProps {
-  item: DownloadItem;
+  item: AnyDownloadItem;
   onPlay?: (path: string) => void;
   onOpenFolder?: (path: string) => void;
 }

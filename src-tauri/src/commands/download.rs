@@ -26,7 +26,7 @@ pub fn start_download(
 
     // Store the child process so we can kill it later (e.g. pause/cancel)
     {
-        let mut active = state.active_downloads.lock().unwrap();
+        let mut active = state.active_downloads.lock().map_err(|e| format!("Lock poisoned: {}", e))?;
         active.insert(id.clone(), child);
     }
 
@@ -56,8 +56,9 @@ pub fn start_download(
                     let mut was_active = false;
                     // Remove from active list
                     if let Some(state_accessor) = app_clone.try_state::<AppState>() {
-                        let mut active = state_accessor.active_downloads.lock().unwrap();
-                        was_active = active.remove(&id_clone).is_some();
+                        if let Ok(mut active) = state_accessor.active_downloads.lock() {
+                            was_active = active.remove(&id_clone).is_some();
+                        }
                     }
 
                     if was_active && payload.code != Some(0) {
@@ -83,7 +84,7 @@ pub fn start_download(
 
 #[tauri::command]
 pub fn pause_download(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let mut active = state.active_downloads.lock().unwrap();
+    let mut active = state.active_downloads.lock().map_err(|e| format!("Lock poisoned: {}", e))?;
     if let Some(child) = active.remove(&id) {
         child.kill().map_err(|e| e.to_string())?;
     }
@@ -91,10 +92,30 @@ pub fn pause_download(state: State<'_, AppState>, id: String) -> Result<(), Stri
 }
 
 #[tauri::command]
-pub fn cancel_download(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let mut active = state.active_downloads.lock().unwrap();
+pub fn cancel_download(
+    state: State<'_, AppState>,
+    id: String,
+    file_paths: Vec<String>,
+) -> Result<(), String> {
+    let mut active = state.active_downloads.lock().map_err(|e| format!("Lock poisoned: {}", e))?;
     if let Some(child) = active.remove(&id) {
-        child.kill().map_err(|e| e.to_string())?;
+        let _ = child.kill();
+    }
+
+    for path in file_paths {
+        if !path.is_empty() {
+            let path_buf = std::path::PathBuf::from(&path);
+            if path_buf.exists() {
+                let _ = std::fs::remove_file(&path_buf);
+            }
+            // Delete standard .part (e.g. file.mp4.part)
+            let raw_part = format!("{}.part", path);
+            let _ = std::fs::remove_file(&raw_part);
+            
+            // Delete standard .ytdl (e.g. file.mp4.ytdl)
+            let raw_ytdl = format!("{}.ytdl", path);
+            let _ = std::fs::remove_file(&raw_ytdl);
+        }
     }
     Ok(())
 }

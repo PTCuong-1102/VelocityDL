@@ -5,12 +5,14 @@ import NumberStepper from '../components/ui/NumberStepper';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useToastStore } from '../stores/toastStore';
 import { invoke } from '@tauri-apps/api/core';
 import { useTauriEvent } from '../hooks/useTauriEvent';
 import { getVersion } from '@tauri-apps/api/app';
 
 export const SettingsPage: React.FC = () => {
-  const { settings, updateSetting, resetDefaults } = useSettingsStore();
+  const { settings, updateSetting, resetDefaults, isSaving } = useSettingsStore();
+  const { addToast } = useToastStore();
 
   // App Update States
   const [currentVersion, setCurrentVersion] = useState('0.3.5');
@@ -93,7 +95,7 @@ export const SettingsPage: React.FC = () => {
       await invoke('exit_app');
     } catch (err) {
       console.error(err);
-      alert(`Failed to execute installer: ${err}`);
+      addToast('error', `Failed to execute installer: ${err}`);
     }
   };
 
@@ -120,21 +122,29 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
-  const handleSave = async () => {
-    try {
-      await invoke('save_settings', { settings });
-      alert('Settings saved successfully!');
-    } catch (err) {
-      console.error('Failed to save settings:', err);
-    }
-  };
+
 
   return (
     <div className="flex-col gap-lg w-full" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
       {/* Header */}
-      <div>
-        <h1>Settings</h1>
-        <p className="text-muted mt-sm">Configure Deno backend engine, downloads storage directory, and interface preferences.</p>
+      <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="flex-col">
+          <h1>Settings</h1>
+          <p className="text-muted mt-sm">Configure Deno backend engine, downloads storage directory, and interface preferences.</p>
+        </div>
+        <div className="flex-row gap-xs text-muted" style={{ fontSize: '13px', alignItems: 'center', backgroundColor: 'var(--surface-container-low)', padding: '6px 14px', borderRadius: 'var(--radius-full)', border: '1px solid var(--outline-variant)' }}>
+          {isSaving ? (
+            <>
+              <span className="icon text-primary-color" style={{ fontSize: '16px', animation: 'pulse 1s infinite ease-in-out' }}>sync</span>
+              <span style={{ fontWeight: 500 }}>Saving changes...</span>
+            </>
+          ) : (
+            <>
+              <span className="icon text-secondary-color" style={{ fontSize: '16px' }}>check_circle</span>
+              <span style={{ fontWeight: 500 }}>Settings auto-saved</span>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Bento Grid */}
@@ -148,13 +158,7 @@ export const SettingsPage: React.FC = () => {
       >
         {/* Left Column (col-span-8) */}
         <div 
-          className="flex-col gap-lg"
-          style={{
-            gridColumn: 'span 8',
-            '@media (max-width: 900px)': {
-              gridColumn: 'span 12'
-            }
-          } as any}
+          className="flex-col gap-lg settings-main-col"
         >
           {/* Deno Engine Panel */}
           <GlassPanel style={{ position: 'relative' }}>
@@ -329,13 +333,7 @@ export const SettingsPage: React.FC = () => {
 
         {/* Right Column (col-span-4) */}
         <div 
-          className="flex-col gap-lg"
-          style={{
-            gridColumn: 'span 4',
-            '@media (max-width: 900px)': {
-              gridColumn: 'span 12'
-            }
-          } as any}
+          className="flex-col gap-lg settings-aside-col"
         >
           {/* General UI Panel */}
           <GlassPanel style={{ height: '100%' }}>
@@ -509,17 +507,13 @@ export const SettingsPage: React.FC = () => {
       >
         <button 
           className="btn btn-ghost" 
-          onClick={resetDefaults}
+          onClick={() => {
+            resetDefaults();
+            addToast('success', 'Settings reset to defaults');
+          }}
           style={{ height: '38px', padding: '0 20px' }}
         >
           Reset Defaults
-        </button>
-        <button 
-          className="btn btn-primary" 
-          onClick={handleSave}
-          style={{ height: '38px', padding: '0 24px' }}
-        >
-          Save Changes
         </button>
       </div>
     </div>

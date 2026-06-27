@@ -22,13 +22,26 @@ export interface DownloadItem {
   createdAt: number;
   completedAt?: number;
   error?: string;
-  isPlaylist?: boolean;      // To differentiate normal and playlist card structures
+  isPlaylist?: false;
 }
 
-export interface PlaylistItem extends DownloadItem {
+export interface PlaylistItem extends Omit<DownloadItem, 'isPlaylist'> {
   isPlaylist: true;
   playlistTitle: string;
   totalItems: number;
   completedItems: number;
   children: DownloadItem[];
+}
+
+/** Union type for any item in the download store */
+export type AnyDownloadItem = DownloadItem | PlaylistItem;
+
+/** Type guard: narrows AnyDownloadItem to PlaylistItem */
+export function isPlaylistItem(item: AnyDownloadItem): item is PlaylistItem {
+  return item.isPlaylist === true;
+}
+
+/** Generate a collision-free download ID */
+export function generateDownloadId(): string {
+  return crypto.randomUUID();
 }

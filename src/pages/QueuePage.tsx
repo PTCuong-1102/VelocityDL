@@ -4,6 +4,7 @@ import PlaylistCard from '../components/ui/PlaylistCard';
 import { useDownloadStore } from '../stores/downloadStore';
 import { useUIStore } from '../stores/uiStore';
 import { useDownload } from '../hooks/useDownload';
+import { isPlaylistItem } from '../types/download';
 
 export const QueuePage: React.FC = () => {
   const { downloads } = useDownloadStore();
@@ -90,10 +91,10 @@ export const QueuePage: React.FC = () => {
       <div className="flex-col gap-md" style={{ marginTop: '8px' }}>
         {filteredItems.length > 0 ? (
           filteredItems.map((item) => (
-            item.isPlaylist ? (
+            isPlaylistItem(item) ? (
               <PlaylistCard 
                 key={item.id} 
-                item={item as any}
+                item={item}
                 onPause={pauseDownload}
                 onResume={resumeDownload}
                 onCancel={cancelDownload}

@@ -7,7 +7,7 @@ import PlaylistCard from '../components/ui/PlaylistCard';
 import GlassPanel from '../components/ui/GlassPanel';
 import { useDownloadStore } from '../stores/downloadStore';
 import { useDownload } from '../hooks/useDownload';
-import { Platform } from '../types/download';
+import { Platform, isPlaylistItem } from '../types/download';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -95,10 +95,10 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="flex-col gap-md">
             {activeItems.map((item) => (
-              item.isPlaylist ? (
+              isPlaylistItem(item) ? (
                 <PlaylistCard 
                   key={item.id} 
-                  item={item as any}
+                  item={item}
                   onPause={pauseDownload}
                   onResume={resumeDownload}
                   onCancel={cancelDownload}
