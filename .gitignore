@@ -42,3 +42,9 @@ src-tauri/binaries/
 # Deno cache
 .deno/
 deno.lock
+
+# Agent and OpenSpec files
+.agent/
+openspec/
+.agent
+openspec
