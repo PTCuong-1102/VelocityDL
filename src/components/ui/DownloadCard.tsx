@@ -1,24 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { DownloadItem } from '../../types/download';
 import { ProgressBar } from './ProgressBar';
 import { StatusDot } from './StatusDot';
 import { formatBytes, formatSpeed, formatETA } from '../../utils/format';
 import { getPlatformColor } from '../../utils/platform';
 import PlatformIcon from '../shared/PlatformIcon';
+import ConfirmDialog from './ConfirmDialog';
 
 interface DownloadCardProps {
   item: DownloadItem;
   onPause?: (id: string) => void;
   onResume?: (id: string) => void;
   onCancel?: (id: string) => void;
+  onRetry?: (id: string) => void;
 }
 
 export const DownloadCard: React.FC<DownloadCardProps> = ({
   item,
   onPause,
   onResume,
-  onCancel
+  onCancel,
+  onRetry
 }) => {
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const isDownloading = item.status === 'downloading';
   const isMerging = item.status === 'merging';
   const isPaused = item.status === 'paused';
@@ -252,12 +256,38 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
           <button 
             className="btn btn-ghost btn-icon flex-center"
             style={{ width: '32px', height: '32px', color: 'var(--error)' }}
-            onClick={() => onCancel(item.id)}
+            onClick={() => setShowCancelConfirm(true)}
           >
             <span className="icon">close</span>
           </button>
         )}
+
+        {isError && onRetry && (
+          <button 
+            className="btn btn-ghost btn-icon flex-center"
+            style={{ width: '32px', height: '32px', color: 'var(--secondary)' }}
+            onClick={() => onRetry(item.id)}
+            title="Retry download"
+          >
+            <span className="icon">refresh</span>
+          </button>
+        )}
       </div>
+
+      {/* Cancel Confirmation Dialog */}
+      <ConfirmDialog
+        open={showCancelConfirm}
+        title="Cancel Download?"
+        message={`Are you sure you want to cancel downloading "${item.title || 'this file'}"? Partial files will be deleted.`}
+        confirmLabel="Cancel Download"
+        cancelLabel="Keep Downloading"
+        variant="danger"
+        onConfirm={() => {
+          setShowCancelConfirm(false);
+          onCancel?.(item.id);
+        }}
+        onCancel={() => setShowCancelConfirm(false)}
+      />
     </div>
   );
 };

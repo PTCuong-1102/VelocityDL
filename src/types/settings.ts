@@ -6,6 +6,7 @@ export interface AppSettings {
     autoUpdateYtdlp: boolean;
     cookieSource: 'none' | 'chrome' | 'firefox' | 'edge' | 'safari' | 'opera' | 'file';
     cookieFilePath: string;
+    speedLimit: number; // 0 = unlimited, value in KB/s
   };
   storage: {
     defaultDownloadPath: string;

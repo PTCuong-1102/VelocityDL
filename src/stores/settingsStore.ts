@@ -22,6 +22,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     autoUpdateYtdlp: true,
     cookieSource: 'none',
     cookieFilePath: '',
+    speedLimit: 0,
   },
   storage: {
     defaultDownloadPath: '', // Will be filled dynamically by Tauri on startup

@@ -50,7 +50,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
     resetUrlInput
   } = useUIStore();
 
-  const analyzedInfo = urlInputAnalyzedInfo as AnalyzedMetadata | null;
+  const analyzedInfo = urlInputAnalyzedInfo;
 
   const subtitleList = (analyzedInfo?.availableSubtitles && analyzedInfo.availableSubtitles.length > 0)
     ? analyzedInfo.availableSubtitles
@@ -63,6 +63,8 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
       );
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [batchUrls, setBatchUrls] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // Download options state
@@ -119,6 +121,35 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
     onDownload(url.trim(), options, analyzedInfo);
   };
 
+  const handleStartBatchDownload = () => {
+    const urls = batchUrls
+      .split('\n')
+      .map((u) => u.trim())
+      .filter((u) => u.startsWith('http://') || u.startsWith('https://'));
+
+    if (urls.length === 0) {
+      setError('Please enter at least one valid video URL starting with http:// or https://');
+      return;
+    }
+
+    const options: DownloadOptions = {
+      maxHeight: downloadMode === 'video' ? selectedHeight : 0,
+      audioOnly: downloadMode === 'audio',
+      extractSubs: extractSubs,
+      selectedSubtitles: selectedSubtitles,
+      embedSubs: embedSubs,
+      audioFormat: downloadMode === 'audio' ? selectedAudioFormat : undefined,
+      audioQuality: downloadMode === 'audio' ? selectedAudioQuality : undefined
+    };
+
+    urls.forEach((u) => {
+      onDownload(u, options);
+    });
+
+    setBatchUrls('');
+    handleReset();
+  };
+
   const handleReset = () => {
     resetUrlInput();
     setError(null);
@@ -131,60 +162,446 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
     return platform.charAt(0).toUpperCase() + platform.slice(1);
   };
 
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
+    if (droppedText) {
+      const trimmed = droppedText.trim().split('\n')[0].trim();
+      if (trimmed && (trimmed.startsWith('http://') || trimmed.startsWith('https://'))) {
+        setUrl(trimmed);
+        setError(null);
+      }
+    }
+  };
+
   return (
     <div className="flex-col gap-md w-full">
       {/* Stage 1: Input URL and Analyze */}
       {!analyzedInfo && (
-        <div className="flex-col gap-md w-full">
-          <div 
-            className="flex-row gap-md w-full"
-            style={{
-              alignItems: 'center',
-              backgroundColor: 'rgba(15, 23, 42, 0.4)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '8px',
-              border: '1px solid var(--outline-variant)',
-              boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.2)'
-            }}
-          >
-            <div style={{ flexGrow: 1 }}>
-              <Input
-                icon="link"
-                mono
-                placeholder="Paste your video, audio, or playlist URL here..."
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && url.trim() && !isAnalyzing) {
-                    handleAnalyze();
+        <div className="flex-col gap-md w-full" style={{ animation: 'fadeInUp 0.25s ease-out' }}>
+          {/* Tabs for Single vs Batch */}
+          <div className="flex-row gap-xs" style={{ borderBottom: '1px solid var(--outline-variant)', paddingBottom: '8px', marginBottom: '4px' }}>
+            <button
+              className={`btn btn-ghost ${!isBatchMode ? 'active' : ''}`}
+              style={{
+                fontSize: '12px',
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-full)',
+                height: '28px',
+                border: 'none',
+                background: !isBatchMode ? 'var(--surface-container-high)' : 'transparent',
+                color: !isBatchMode ? 'var(--primary)' : 'var(--on-surface-variant)'
+              }}
+              onClick={() => {
+                setIsBatchMode(false);
+                setError(null);
+              }}
+            >
+              Single URL
+            </button>
+            <button
+              className={`btn btn-ghost ${isBatchMode ? 'active' : ''}`}
+              style={{
+                fontSize: '12px',
+                padding: '6px 14px',
+                borderRadius: 'var(--radius-full)',
+                height: '28px',
+                border: 'none',
+                background: isBatchMode ? 'var(--surface-container-high)' : 'transparent',
+                color: isBatchMode ? 'var(--primary)' : 'var(--on-surface-variant)'
+              }}
+              onClick={() => {
+                setIsBatchMode(true);
+                setError(null);
+              }}
+            >
+              Batch URLs
+            </button>
+          </div>
+
+          {!isBatchMode ? (
+            /* Single URL input field */
+            <div 
+              className="flex-row gap-md w-full"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              style={{
+                alignItems: 'center',
+                backgroundColor: isDragging ? 'rgba(79, 70, 229, 0.15)' : 'rgba(15, 23, 42, 0.4)',
+                borderRadius: 'var(--radius-lg)',
+                padding: '8px',
+                border: isDragging ? '2px dashed var(--primary)' : '1px solid var(--outline-variant)',
+                boxShadow: isDragging ? 'var(--glow-primary-strong)' : 'inset 0 2px 4px rgba(0, 0, 0, 0.2)',
+                transition: 'all 0.2s ease',
+                position: 'relative'
+              }}
+            >
+              {/* Drop zone overlay */}
+              {isDragging && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    borderRadius: 'var(--radius-lg)',
+                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                    zIndex: 10,
+                    pointerEvents: 'none'
+                  }}
+                >
+                  <span className="icon text-primary-color" style={{ fontSize: '24px' }}>file_download</span>
+                  <span style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px' }}>Drop URL here</span>
+                </div>
+              )}
+              <div style={{ flexGrow: 1 }}>
+                <Input
+                  icon="link"
+                  mono
+                  placeholder="Paste your video, audio, or playlist URL here..."
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && url.trim() && !isAnalyzing) {
+                      handleAnalyze();
+                    } else if (e.key === 'Escape') {
+                      handleReset();
+                    }
+                  }}
+                  disabled={isAnalyzing}
+                  style={{
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    fontSize: '14px',
+                    height: '42px',
+                    color: 'var(--on-surface)'
+                  }}
+                />
+              </div>
+
+              <Button
+                variant="primary"
+                icon={isAnalyzing ? undefined : 'search'}
+                style={{
+                  height: '42px',
+                  padding: '0 24px',
+                  borderRadius: 'var(--radius-md)',
+                  minWidth: '130px'
+                }}
+                onClick={handleAnalyze}
+                disabled={!url.trim() || isAnalyzing}
+              >
+                {isAnalyzing ? 'Analyzing...' : 'Analyze Link'}
+              </Button>
+            </div>
+          ) : (
+            /* Batch URLs input area */
+            <div className="flex-col gap-md w-full" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+              <div 
+                className="flex-col w-full"
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDragging(false);
+                  const droppedText = e.dataTransfer.getData('text/plain') || e.dataTransfer.getData('text/uri-list');
+                  if (droppedText) {
+                    setBatchUrls((prev) => (prev ? prev + '\n' + droppedText.trim() : droppedText.trim()));
+                    setError(null);
                   }
                 }}
-                disabled={isAnalyzing}
                 style={{
-                  border: 'none',
-                  backgroundColor: 'transparent',
-                  fontSize: '14px',
-                  height: '42px',
-                  color: 'var(--on-surface)'
+                  backgroundColor: isDragging ? 'rgba(79, 70, 229, 0.15)' : 'rgba(15, 23, 42, 0.4)',
+                  borderRadius: 'var(--radius-lg)',
+                  padding: '12px',
+                  border: isDragging ? '2px dashed var(--primary)' : '1px solid var(--outline-variant)',
+                  boxShadow: isDragging ? 'var(--glow-primary-strong)' : 'inset 0 2px 4px rgba(0, 0, 0, 0.2)',
+                  transition: 'all 0.2s ease',
+                  position: 'relative'
                 }}
-              />
-            </div>
+              >
+                {/* Drag drop zone overlay for batch */}
+                {isDragging && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      borderRadius: 'var(--radius-lg)',
+                      backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                      zIndex: 10,
+                      pointerEvents: 'none'
+                    }}
+                  >
+                    <span className="icon text-primary-color" style={{ fontSize: '24px' }}>file_download</span>
+                    <span style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px' }}>Drop text file or links here</span>
+                  </div>
+                )}
+                
+                <textarea
+                  placeholder="Enter multiple URLs here, one per line (e.g. YouTube, TikTok, Facebook, Spotify links)..."
+                  value={batchUrls}
+                  onChange={(e) => setBatchUrls(e.target.value)}
+                  disabled={isAnalyzing}
+                  style={{
+                    border: 'none',
+                    backgroundColor: 'transparent',
+                    fontFamily: 'monospace',
+                    fontSize: '13px',
+                    height: '120px',
+                    color: 'var(--on-surface)',
+                    resize: 'vertical',
+                    outline: 'none',
+                    lineHeight: '1.6',
+                    width: '100%'
+                  }}
+                />
 
-            <Button
-              variant="primary"
-              icon={isAnalyzing ? undefined : 'search'}
-              style={{
-                height: '42px',
-                padding: '0 24px',
-                borderRadius: 'var(--radius-md)',
-                minWidth: '130px'
-              }}
-              onClick={handleAnalyze}
-              disabled={!url.trim() || isAnalyzing}
-            >
-              {isAnalyzing ? 'Analyzing...' : 'Analyze Link'}
-            </Button>
-          </div>
+                <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--outline-variant)', paddingTop: '8px', marginTop: '4px' }}>
+                  {/* File Import input */}
+                  <label 
+                    className="btn btn-ghost flex-row gap-xs" 
+                    style={{ 
+                      fontSize: '11px', 
+                      height: '28px', 
+                      padding: '0 10px', 
+                      cursor: 'pointer',
+                      alignItems: 'center',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--outline-variant)',
+                      backgroundColor: 'var(--surface-container-low)'
+                    }}
+                  >
+                    <span className="icon" style={{ fontSize: '14px' }}>attach_file</span>
+                    Import from .txt
+                    <input 
+                      type="file" 
+                      accept=".txt" 
+                      style={{ display: 'none' }} 
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const text = event.target?.result as string;
+                            if (text) {
+                              setBatchUrls((prev) => (prev ? prev + '\n' + text.trim() : text.trim()));
+                              setError(null);
+                            }
+                          };
+                          reader.readAsText(file);
+                        }
+                      }} 
+                    />
+                  </label>
+                  
+                  <span className="text-muted" style={{ fontSize: '11px' }}>
+                    {batchUrls.split('\n').filter(l => l.trim().startsWith('http')).length} valid URLs
+                  </span>
+                </div>
+              </div>
+
+              {/* Batch Options section */}
+              <div 
+                className="flex-col gap-lg"
+                style={{
+                  padding: '16px 20px',
+                  backgroundColor: 'rgba(255,255,255,0.01)',
+                  borderRadius: 'var(--radius-lg)',
+                  border: '1px solid var(--outline-variant)',
+                  marginTop: '4px'
+                }}
+              >
+                {/* Options Grid */}
+                <div 
+                  style={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', 
+                    gap: '20px' 
+                  }}
+                >
+                  {/* Format Mode Option */}
+                  <div className="flex-col gap-sm">
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>
+                      Download Format Mode
+                    </span>
+                    <div className="flex-row gap-sm">
+                      <button
+                        className={`btn ${downloadMode === 'video' ? 'btn-primary' : 'btn-ghost'}`}
+                        style={{ flexGrow: 1, height: '36px', borderRadius: 'var(--radius-md)', fontSize: '13px' }}
+                        onClick={() => setDownloadMode('video')}
+                      >
+                        <span className="icon">movie</span>
+                        Video
+                      </button>
+                      <button
+                        className={`btn ${downloadMode === 'audio' ? 'btn-primary' : 'btn-ghost'}`}
+                        style={{ flexGrow: 1, height: '36px', borderRadius: 'var(--radius-md)', fontSize: '13px' }}
+                        onClick={() => setDownloadMode('audio')}
+                      >
+                        <span className="icon">music_note</span>
+                        Audio (MP3)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quality Settings */}
+                  <div className="flex-col gap-sm">
+                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>
+                      Quality Settings
+                    </span>
+                    {downloadMode === 'video' ? (
+                      <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
+                        {[
+                          { height: 360, label: '360p' },
+                          { height: 480, label: '480p' },
+                          { height: 720, label: '720p (HD)' },
+                          { height: 1080, label: '1080p (FHD)' },
+                          { height: 1440, label: '1440p (2K)' },
+                          { height: 2160, label: '2160p (4K)' }
+                        ].map((q) => (
+                          <button
+                            key={q.height}
+                            type="button"
+                            className={`btn ${selectedHeight === q.height ? 'btn-primary' : 'btn-ghost'}`}
+                            style={{ 
+                              minWidth: '70px',
+                              height: '36px', 
+                              fontSize: '12px',
+                              flex: '1 1 auto',
+                              padding: '0 6px'
+                            }}
+                            onClick={() => setSelectedHeight(q.height)}
+                          >
+                            {q.label}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex-col gap-sm" style={{ width: '100%' }}>
+                        <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
+                          {['mp3', 'm4a', 'wav', 'flac'].map((fmt) => (
+                            <button
+                              key={fmt}
+                              type="button"
+                              className={`btn ${selectedAudioFormat === fmt ? 'btn-primary' : 'btn-ghost'}`}
+                              style={{
+                                minWidth: '50px',
+                                height: '32px',
+                                fontSize: '11px',
+                                textTransform: 'uppercase',
+                                flex: '1 1 auto'
+                              }}
+                              onClick={() => setSelectedAudioFormat(fmt)}
+                            >
+                              {fmt}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
+                          {[
+                            { value: '320k', label: '320k' },
+                            { value: '256k', label: '256k' },
+                            { value: '192k', label: '192k' },
+                            { value: '128k', label: '128k' }
+                          ].map((q) => (
+                            <button
+                              key={q.value}
+                              type="button"
+                              className={`btn ${selectedAudioQuality === q.value ? 'btn-primary' : 'btn-ghost'}`}
+                              style={{
+                                minWidth: '50px',
+                                height: '32px',
+                                fontSize: '11px',
+                                flex: '1 1 auto'
+                              }}
+                              onClick={() => setSelectedAudioQuality(q.value)}
+                            >
+                              {q.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Subtitles Options (For Batch Video) */}
+                {downloadMode === 'video' && (
+                  <div 
+                    className="flex-col gap-sm"
+                    style={{
+                      backgroundColor: 'rgba(255,255,255,0.02)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '12px 16px',
+                      border: '1px solid var(--outline-variant)'
+                    }}
+                  >
+                    <Toggle 
+                      label="Extract & Download Subtitles (if available)" 
+                      checked={extractSubs}
+                      onChange={(e) => setExtractSubs(e.target.checked)}
+                    />
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div 
+                  className="flex-row gap-md" 
+                  style={{ 
+                    justifyContent: 'flex-end', 
+                    borderTop: '1px solid var(--outline-variant)',
+                    paddingTop: '16px',
+                    marginTop: '4px'
+                  }}
+                >
+                  <Button 
+                    variant="ghost" 
+                    icon="restart_alt"
+                    style={{ height: '38px', padding: '0 16px' }}
+                    onClick={() => {
+                      setBatchUrls('');
+                      setError(null);
+                    }}
+                  >
+                    Clear List
+                  </Button>
+                  <Button 
+                    variant="primary" 
+                    icon="download"
+                    style={{ height: '38px', padding: '0 24px', fontWeight: 600 }}
+                    onClick={handleStartBatchDownload}
+                    disabled={!batchUrls.trim()}
+                  >
+                    Download Batch ({batchUrls.split('\n').filter(l => l.trim().startsWith('http')).length})
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Shimmer loading skeleton */}
           {isAnalyzing && (

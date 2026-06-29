@@ -49,7 +49,8 @@ pub fn load_settings(app: tauri::AppHandle) -> Result<Value, String> {
                 "proxyAddress": "",
                 "autoUpdateYtdlp": true,
                 "cookieSource": "none",
-                "cookieFilePath": ""
+                "cookieFilePath": "",
+                "speedLimit": 0
             },
             "storage": {
                 "defaultDownloadPath": default_download,

@@ -48,3 +48,6 @@ deno.lock
 openspec/
 .agent
 openspec
+
+# Scratch output
+scratch_out/

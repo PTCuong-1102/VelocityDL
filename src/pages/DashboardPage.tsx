@@ -8,27 +8,43 @@ import GlassPanel from '../components/ui/GlassPanel';
 import { useDownloadStore } from '../stores/downloadStore';
 import { useDownload } from '../hooks/useDownload';
 import { Platform, isPlaylistItem } from '../types/download';
+import { formatBytes } from '../utils/format';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { downloads } = useDownloadStore();
-  const { startDownload, pauseDownload, resumeDownload, cancelDownload } = useDownload();
+  const { startDownload, pauseDownload, resumeDownload, cancelDownload, retryDownload } = useDownload();
 
   // Show only active/downloading/queued/paused items, max 3
   const activeItems = downloads
     .filter((d) => d.status !== 'finished')
     .slice(0, 3);
 
+  // Statistics
+  const totalCompleted = downloads.filter((d) => d.status === 'finished').length;
+  const totalActive = downloads.filter((d) => ['downloading', 'merging', 'queued', 'paused'].includes(d.status)).length;
+  const totalFailed = downloads.filter((d) => d.status === 'error').length;
+  const totalDataBytes = downloads
+    .filter((d) => d.status === 'finished')
+    .reduce((acc, d) => acc + (d.totalBytes || 0), 0);
+  const successRate = (totalCompleted + totalFailed) > 0
+    ? Math.round((totalCompleted / (totalCompleted + totalFailed)) * 100)
+    : 100;
+
+  const statsCards = [
+    { icon: 'check_circle', label: 'Completed', value: String(totalCompleted), color: '#6bd8cb' },
+    { icon: 'sync', label: 'Active', value: String(totalActive), color: '#c3c0ff' },
+    { icon: 'data_usage', label: 'Data Downloaded', value: formatBytes(totalDataBytes), color: '#ffb95f' },
+    { icon: 'trending_up', label: 'Success Rate', value: `${successRate}%`, color: successRate >= 80 ? '#6bd8cb' : '#ffb4ab' },
+  ];
+
   const handleDownload = (url: string, options: DownloadOptions, prefetchedInfo?: any) => {
     startDownload(url, options, prefetchedInfo);
-    // Redirect to Queue page to watch progress
     navigate('/queue');
   };
 
   const handlePlatformClick = (platform: Platform) => {
-    // If clicked, focus input or set template link
     console.log(`Quick download for ${platform}`);
-    // Navigate to embedded browser
     navigate('/browser');
   };
 
@@ -42,9 +58,51 @@ export const DashboardPage: React.FC = () => {
         </p>
       </div>
 
+      {/* Statistics Cards */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+          gap: '12px',
+          width: '100%'
+        }}
+      >
+        {statsCards.map((stat) => (
+          <GlassPanel
+            key={stat.label}
+            style={{
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: '-20px',
+                right: '-20px',
+                width: '80px',
+                height: '80px',
+                background: `radial-gradient(circle, ${stat.color}15 0%, rgba(0,0,0,0) 70%)`,
+                pointerEvents: 'none'
+              }}
+            />
+            <div className="flex-row gap-sm" style={{ alignItems: 'center' }}>
+              <span className="icon" style={{ fontSize: '20px', color: stat.color }}>{stat.icon}</span>
+              <span className="text-muted" style={{ fontSize: '12px', fontWeight: 500 }}>{stat.label}</span>
+            </div>
+            <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--on-surface)', letterSpacing: '-0.5px' }}>
+              {stat.value}
+            </span>
+          </GlassPanel>
+        ))}
+      </div>
+
       {/* Main paste hero URL card */}
       <GlassPanel style={{ padding: '32px', position: 'relative' }}>
-        {/* Abstract background glow blob */}
         <div
           style={{
             position: 'absolute',
@@ -56,7 +114,6 @@ export const DashboardPage: React.FC = () => {
             pointerEvents: 'none'
           }}
         />
-        
         <h2 style={{ marginBottom: '16px', fontWeight: 600 }}>Download New Media</h2>
         <URLInput onDownload={handleDownload} />
       </GlassPanel>
@@ -110,6 +167,7 @@ export const DashboardPage: React.FC = () => {
                   onPause={pauseDownload}
                   onResume={resumeDownload}
                   onCancel={cancelDownload}
+                  onRetry={retryDownload}
                 />
               )
             ))}

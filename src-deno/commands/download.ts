@@ -64,10 +64,11 @@ export async function downloadMedia(
     return;
   }
 
-  // Load Settings for Cookie configuration
+  // Load Settings for Cookie configuration and Speed Limit
   const settings = await getSettings();
   const cookieSource = settings?.engine?.cookieSource || "none";
   const cookieFilePath = settings?.engine?.cookieFilePath || "";
+  const speedLimit = settings?.engine?.speedLimit || 0;
 
   let tempCookieFile: string | null = null;
   let finalCookieFile: string | null = null;
@@ -90,7 +91,7 @@ export async function downloadMedia(
 
     // 3. Route Instagram Posts / Reels to gallery-dl (to support photos & video downloading)
     if (lowerUrl.includes("instagram.com") && (lowerUrl.includes("/p/") || lowerUrl.includes("/reel/") || lowerUrl.includes("/reels/"))) {
-      await downloadGallerydl(id, url, saveDir, finalCookieFile, "Instagram Post");
+      await downloadGallerydl(id, url, saveDir, finalCookieFile, "Instagram Post", speedLimit);
       return;
     }
 
@@ -100,13 +101,13 @@ export async function downloadMedia(
         !lowerUrl.includes("/watch") && 
         !lowerUrl.includes("/reel/") && 
         (lowerUrl.includes("/photo") || lowerUrl.includes("/posts/") || lowerUrl.includes("/permalink") || lowerUrl.includes("/media/"))) {
-      await downloadGallerydl(id, url, saveDir, finalCookieFile, "Facebook Post/Photo");
+      await downloadGallerydl(id, url, saveDir, finalCookieFile, "Facebook Post/Photo", speedLimit);
       return;
     }
 
     // 5. Route TikTok Stories / Slideshows to gallery-dl
     if (lowerUrl.includes("tiktok.com") && (lowerUrl.includes("/story/") || lowerUrl.includes("/photo/"))) {
-      await downloadGallerydl(id, url, saveDir, finalCookieFile, "TikTok Story/Slideshow");
+      await downloadGallerydl(id, url, saveDir, finalCookieFile, "TikTok Story/Slideshow", speedLimit);
       return;
     }
 
@@ -118,7 +119,7 @@ export async function downloadMedia(
     }
 
     // 7. Default Route: yt-dlp
-    await downloadYtdlp(id, url, saveDir, options, cookieSource, finalCookieFile);
+    await downloadYtdlp(id, url, saveDir, options, cookieSource, finalCookieFile, speedLimit);
 
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
@@ -256,7 +257,8 @@ async function downloadYtdlp(
   saveDir: string,
   options: DownloadOptions,
   cookieSource: string,
-  cookieFilePath: string | null
+  cookieFilePath: string | null,
+  speedLimit: number
 ): Promise<void> {
   const ytdlpPath = getYtdlpPath();
   const ffmpegDir = getFfmpegDir();
@@ -295,6 +297,11 @@ async function downloadYtdlp(
     args.push("--cookies", cookieFilePath);
   } else if (cookieSource !== "none" && cookieSource !== "file") {
     args.push("--cookies-from-browser", cookieSource);
+  }
+
+  // Handle speed limit
+  if (speedLimit > 0) {
+    args.push("--limit-rate", `${speedLimit}K`);
   }
 
   args.push(
@@ -549,7 +556,8 @@ async function downloadGallerydl(
   url: string,
   saveDir: string,
   cookieFilePath: string | null,
-  platformLabel: string
+  platformLabel: string,
+  speedLimit: number
 ): Promise<void> {
   const gallerydlPath = getGallerydlPath();
 
@@ -560,6 +568,10 @@ async function downloadGallerydl(
 
   if (cookieFilePath) {
     args.push("--cookies", cookieFilePath);
+  }
+
+  if (speedLimit > 0) {
+    args.push("--limit-rate", `${speedLimit}K`);
   }
 
   args.push(url);

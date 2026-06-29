@@ -1,17 +1,18 @@
 import { create } from 'zustand';
+import { AnalyzedMetadata } from '../components/shared/URLInput';
 
 interface UIState {
   sidebarCollapsed: boolean;
   searchQuery: string;
   addUrlModalOpen: boolean;
   urlInputUrl: string;
-  urlInputAnalyzedInfo: any | null;
+  urlInputAnalyzedInfo: AnalyzedMetadata | null;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSearchQuery: (query: string) => void;
   setAddUrlModalOpen: (isOpen: boolean) => void;
   setUrlInputUrl: (url: string) => void;
-  setUrlInputAnalyzedInfo: (info: any | null) => void;
+  setUrlInputAnalyzedInfo: (info: AnalyzedMetadata | null) => void;
   resetUrlInput: () => void;
 }
 

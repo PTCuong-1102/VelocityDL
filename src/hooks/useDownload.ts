@@ -262,11 +262,24 @@ export function useDownload() {
     }
   };
 
+  const retryDownload = (id: string) => {
+    // Reset the item back to 'queued' so Queue Manager picks it up
+    useDownloadStore.setState((state) => ({
+      downloads: state.downloads.map((d) =>
+        d.id === id
+          ? { ...d, status: 'queued' as const, error: undefined, progress: 0, speed: 0, eta: 0, downloadedBytes: 0 }
+          : d
+      )
+    }));
+    addToast('info', 'Retrying download...');
+  };
+
   return {
     startDownload,
     pauseDownload,
     resumeDownload,
-    cancelDownload
+    cancelDownload,
+    retryDownload
   };
 }
 

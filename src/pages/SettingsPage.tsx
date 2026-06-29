@@ -195,6 +195,41 @@ export const SettingsPage: React.FC = () => {
 
               <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
 
+              {/* Speed Limit */}
+              <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="flex-col" style={{ gap: '4px' }}>
+                  <span style={{ fontWeight: 500, fontSize: '13px' }}>Download Speed Limit</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>Restrict maximum download bandwidth usage.</span>
+                </div>
+                <select
+                  style={{
+                    backgroundColor: 'var(--surface-container-lowest)',
+                    border: '1px solid var(--outline-variant)',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'var(--on-surface)',
+                    padding: '8px 12px',
+                    outline: 'none',
+                    fontSize: '13px',
+                    height: '38px',
+                    cursor: 'pointer',
+                    width: '150px'
+                  }}
+                  value={settings.engine.speedLimit || 0}
+                  onChange={(e) => updateSetting('engine', 'speedLimit', Number(e.target.value))}
+                >
+                  <option value={0}>Unlimited</option>
+                  <option value={512}>500 KB/s</option>
+                  <option value={1024}>1 MB/s</option>
+                  <option value={2048}>2 MB/s</option>
+                  <option value={5120}>5 MB/s</option>
+                  <option value={10240}>10 MB/s</option>
+                  <option value={20480}>20 MB/s</option>
+                  <option value={51200}>50 MB/s</option>
+                </select>
+              </div>
+
+              <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
+
               {/* Proxy Type & Address */}
               <div className="flex-col gap-sm">
                 <span style={{ fontWeight: 500, fontSize: '13px' }}>Network Proxy Settings</span>
@@ -458,7 +493,7 @@ export const SettingsPage: React.FC = () => {
                     <div style={{
                       width: `${downloadProgress}%`,
                       height: '100%',
-                      background: 'linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%)',
+                      background: 'linear-gradient(90deg, var(--primary-container) 0%, var(--secondary-container) 100%)',
                       transition: 'width 0.2s ease-out'
                     }} />
                   </div>

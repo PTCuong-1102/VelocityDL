@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useUIStore } from '../../stores/uiStore';
+import { getVersion } from '@tauri-apps/api/app';
 
 export const SideNav: React.FC = () => {
   const { sidebarCollapsed, toggleSidebar, resetUrlInput } = useUIStore();
   const navigate = useNavigate();
+  const [appVersion, setAppVersion] = useState('0.0.0');
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion('0.0.0'));
+  }, []);
 
   const menuItems = [
     { path: '/', label: 'Dashboard', icon: 'dashboard' },
@@ -51,7 +57,7 @@ export const SideNav: React.FC = () => {
         {!sidebarCollapsed && (
           <div className="flex-col" style={{ flexGrow: 1 }}>
             <span style={{ fontWeight: 600, fontSize: '15px', color: 'var(--on-surface)' }}>VelocityDL</span>
-            <span className="badge badge-primary" style={{ alignSelf: 'flex-start', marginTop: '2px', fontSize: '9px', padding: '1px 4px' }}>Pro v2.0</span>
+            <span className="badge badge-primary" style={{ alignSelf: 'flex-start', marginTop: '2px', fontSize: '9px', padding: '1px 4px' }}>v{appVersion}</span>
           </div>
         )}
       </div>
