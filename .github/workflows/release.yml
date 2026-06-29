@@ -57,5 +57,5 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'VelocityDL v__VERSION__'
           releaseBody: 'VelocityDL desktop release for Windows and Linux.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
