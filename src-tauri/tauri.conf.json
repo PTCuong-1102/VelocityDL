@@ -23,7 +23,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["deb", "rpm", "appimage", "nsis", "msi"],
+    "targets": ["deb", "appimage"],
     "externalBin": [
       "binaries/deno-engine"
     ],
