@@ -82,7 +82,7 @@ export const useDownloadStore = create<DownloadState>()(
               status: payload.status,
               speed: payload.status === 'finished' ? 0 : payload.speed,
               eta: payload.status === 'finished' ? 0 : payload.eta,
-              error: payload.error || item.error,
+              error: payload.status === 'error' ? payload.error || item.error : undefined,
               completedAt: payload.status === 'finished' ? Date.now() : item.completedAt,
               outputPath: payload.outputPath || item.outputPath,
             };
@@ -95,7 +95,7 @@ export const useDownloadStore = create<DownloadState>()(
               speed: payload.speed,
               eta: payload.eta,
               status: payload.status,
-              error: payload.error || item.error,
+              error: payload.status === 'error' ? payload.error || item.error : undefined,
               completedAt: payload.status === 'finished' ? Date.now() : item.completedAt,
               outputPath: payload.outputPath || item.outputPath,
             };

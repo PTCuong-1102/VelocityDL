@@ -5,7 +5,7 @@ import { useUIStore } from '../stores/uiStore';
 import { invoke } from '@tauri-apps/api/core';
 
 export const FinishedPage: React.FC = () => {
-  const { downloads, removeDownload } = useDownloadStore();
+  const { downloads, clearFinished } = useDownloadStore();
   const { searchQuery } = useUIStore();
 
   // Get finished items
@@ -21,7 +21,6 @@ export const FinishedPage: React.FC = () => {
 
   const handlePlay = async (path: string) => {
     try {
-      // In Phase 10 we'll implement these Tauri commands. For now we run invoke.
       await invoke('open_file', { path });
     } catch (err) {
       console.error('Failed to play file:', err);
@@ -52,7 +51,7 @@ export const FinishedPage: React.FC = () => {
             className="btn btn-ghost" 
             style={{ fontSize: '12px', padding: '6px 12px', height: '28px', color: 'var(--error)' }}
             onClick={() => {
-              finishedItems.forEach((d) => removeDownload(d.id));
+              clearFinished();
             }}
           >
             <span className="icon" style={{ fontSize: '16px' }}>delete_sweep</span>

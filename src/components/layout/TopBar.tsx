@@ -2,10 +2,12 @@ import React from 'react';
 import SearchBar from '../shared/SearchBar';
 import { useDownloadStore } from '../../stores/downloadStore';
 import { useSettingsStore } from '../../stores/settingsStore';
+import useToastStore from '../../stores/toastStore';
 
 export const TopBar: React.FC = () => {
   const { downloads } = useDownloadStore();
   const { settings } = useSettingsStore();
+  const { addToast } = useToastStore();
 
   // Calculate speed and active threads
   const activeDownloads = downloads.filter((d) => d.status === 'downloading');
@@ -82,7 +84,18 @@ export const TopBar: React.FC = () => {
 
 
         {/* Help Info Icon */}
-        <button className="btn btn-ghost btn-icon flex-center" style={{ border: 'none' }}>
+        <button
+          className="btn btn-ghost btn-icon flex-center"
+          style={{ border: 'none' }}
+          title="Keyboard shortcuts: Ctrl+1 Dashboard, Ctrl+2 Queue, Ctrl+3 Finished, Ctrl+4 Settings, Esc Dashboard"
+          onClick={() =>
+            addToast(
+              'info',
+              'Shortcuts: Ctrl+1 Dashboard · Ctrl+2 Queue · Ctrl+3 Finished · Ctrl+4 Settings · Esc Dashboard',
+              6000
+            )
+          }
+        >
           <span className="icon">help_outline</span>
         </button>
       </div>

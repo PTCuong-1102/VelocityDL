@@ -4,6 +4,20 @@ import { invoke } from '@tauri-apps/api/core';
 import { DownloadOptions } from '../components/shared/URLInput';
 import { Platform, PlaylistItem, isPlaylistItem, generateDownloadId } from '../types/download';
 import useToastStore from '../stores/toastStore';
+import { useSettingsStore } from '../stores/settingsStore';
+
+/** OS-level notification, honoring the user's desktopNotifications setting. */
+function notifyDesktop(title: string, body: string) {
+  try {
+    if (useSettingsStore.getState().settings.general.desktopNotifications !== false) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, { body });
+      }
+    }
+  } catch {
+    // Notifications unavailable — toast feedback already covers it.
+  }
+}
 
 export function useDownload() {
   const { 
@@ -75,21 +89,34 @@ export function useDownload() {
             }
           }
           addToast('success', `✓ Playlist download completed: ${item.title}`);
+          notifyDesktop('VelocityDL', `Playlist download completed: ${item.title}`);
         } else {
           const title = item.title || 'Download';
           addToast('success', `✓ Completed: ${title}`);
+          notifyDesktop('VelocityDL — download finished', title);
         }
       }
     }
     // Show error toast when a download fails
     if (payload.status === 'error' && payload.error) {
       addToast('error', `Download failed: ${payload.error}`);
+      notifyDesktop('VelocityDL — download failed', String(payload.error).substring(0, 200));
     }
   });
 
   const startDownload = async (url: string, options: DownloadOptions, prefetchedInfo?: any) => {
     const id = generateDownloadId();
-    
+    // Persist the user's chosen options on the item so the queue manager
+    // can forward them verbatim to the backend (subtitles were dropped here).
+    const persistedOptions = {
+      maxHeight: options.audioOnly ? 0 : options.maxHeight,
+      extractSubs: options.extractSubs,
+      selectedSubtitles: options.selectedSubtitles ?? [],
+      embedSubs: options.embedSubs ?? true,
+      audioFormat: options.audioFormat,
+      audioQuality: options.audioQuality,
+    };
+
     // Add default queued item in UI
     if (prefetchedInfo?.isPlaylist) {
       const playlistItem: PlaylistItem = {
@@ -114,6 +141,7 @@ export function useDownload() {
         playlistTitle: prefetchedInfo.title || 'Unknown Playlist',
         totalItems: prefetchedInfo.totalItems || 0,
         completedItems: 0,
+        ...persistedOptions,
         children: prefetchedInfo.entries?.map((entry: any, index: number) => ({
           id: `${id}-child-${index}`,
           url: entry.url,
@@ -151,7 +179,8 @@ export function useDownload() {
         thumbnailUrl: prefetchedInfo?.thumbnailUrl,
         duration: prefetchedInfo?.duration,
         createdAt: Date.now(),
-        outputPath: ''
+        outputPath: '',
+        ...persistedOptions
       });
     }
 
@@ -255,7 +284,7 @@ export function useDownload() {
     }
 
     try {
-      await invoke('cancel_download', { id, filePaths });
+      await invoke('cancel_download', { id, filePaths, saveDir: item?.saveDir ?? '' });
       storeCancel(id);
     } catch (err) {
       console.error('Failed to cancel download:', err);

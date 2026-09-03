@@ -1,4 +1,5 @@
 import { getYtdlpPath, getSpotdlPath } from "../utils/paths.ts";
+import { isFacebookStoryUrl as isFacebookStoryPath } from "./download.ts";
 
 interface FormatEntry {
   format_id?: string;
@@ -70,6 +71,55 @@ function formatQuality(width: number, height: number): string {
   return "Unknown";
 }
 
+/**
+ * Robust playlist detection — avoids false-positives from naive
+ * `url.includes("list=")` / `includes("playlist")` substring checks
+ * (e.g. https://example.com/playlist-review, ?playlistName=...).
+ *
+ * Rules:
+ * - YouTube: `list` query param present AND host is youtube.com/youtu.be
+ *   AND path looks like /watch or /playlist (youtubelist URLs always use these).
+ * - Spotify album/playlist/collection/show: path segment match.
+ * - Everything else: explicit /playlist/ path segment only.
+ */
+export function isPlaylistUrl(rawUrl: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  const path = parsed.pathname.toLowerCase();
+  const params = parsed.searchParams;
+
+  const isYouTube =
+    host.includes("youtube.com") || host.includes("youtu.be");
+  if (isYouTube) {
+    const listParam = params.get("list");
+    // youtu.be share links never carry playlists; /watch + list= or /playlist?list= do.
+    if (listParam && (path.startsWith("/watch") || path.startsWith("/playlist"))) {
+      return true;
+    }
+    return false;
+  }
+
+  const isSpotify = host.includes("spotify.com");
+  if (isSpotify) {
+    // /album/, /playlist/, /collection/, /show/ (+ /episode/ treated as single)
+    return /^\/(album|playlist|collection|show)(\/|$)/.test(path) ||
+      /^\/[^/]+\/playlist(\/|$)/.test(path);
+  }
+
+  // Generic fallback: only an explicit "/playlist/" path segment counts.
+  if (/(^|\/)playlist(\/|$)/.test(path)) {
+    return true;
+  }
+
+  return false;
+}
+
 interface SubtitleInfo {
   lang: string;
   name: string;
@@ -112,11 +162,28 @@ function extractAvailableSubtitles(rawData: any): SubtitleInfo[] {
 export async function getVideoInfo(url: string): Promise<void> {
   const lowerUrl = url.toLowerCase();
 
-  // Facebook Stories Check
-  if (lowerUrl.includes("facebook.com/stories") || lowerUrl.includes("facebook.com/story")) {
+  // Facebook Stories Check — /stories/ path form is handled by the
+  // built-in scraper (yt-dlp can't parse it); story.php URLs fall through
+  // to yt-dlp below. Page HTML is only fetched at download time, so info
+  // is generic + flagged as cookie-gated for the UI warning.
+  if (isFacebookStoryPath(url)) {
+    const match = url.match(/facebook\.com\/stories\/([a-zA-Z0-9_.]+)/i);
+    const storyId = match ? match[1] : "story";
     console.log(JSON.stringify({
-      status: "error",
-      message: "Facebook Stories are currently not supported due to security and API restrictions."
+      type: "info",
+      data: {
+        isPlaylist: false,
+        title: `Facebook Story [${storyId}]`,
+        thumbnailUrl: "https://www.facebook.com/favicon.ico",
+        duration: "Story",
+        durationSeconds: 0,
+        uploader: "Facebook",
+        format: "mp4/jpg",
+        quality: "HD",
+        availableQualities: ["HD"],
+        platform: "facebook",
+        requiresCookies: true
+      }
     }));
     return;
   }
@@ -318,10 +385,10 @@ export async function getVideoInfo(url: string): Promise<void> {
   const ytdlpPath = getYtdlpPath();
 
   try {
-    const isPlaylist = url.toLowerCase().includes("list=") || url.toLowerCase().includes("playlist");
+    const isPlaylist = isPlaylistUrl(url);
     const args = isPlaylist 
-      ? ["--flat-playlist", "--dump-single-json", url]
-      : ["--dump-json", "--no-playlist", url];
+      ? ["--flat-playlist", "--dump-single-json", "--no-warnings", url]
+      : ["--dump-json", "--no-playlist", "--no-warnings", url];
 
     const command = new Deno.Command(ytdlpPath, {
       args,

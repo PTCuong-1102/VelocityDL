@@ -199,6 +199,20 @@ npm run build:all
 npm run tauri build
 ```
 
+### Arch Linux
+
+Tauri has no native `pacman` bundle target, so Arch is covered via AUR
+(binary, extracted from the official `.deb`) and a portable `.tar.gz`
+— see [`packaging/arch/README.md`](packaging/arch/README.md):
+
+```bash
+yay -S velocitydl
+# or portable tarball:
+tar -xzf VelocityDL-0.6.0-linux-x86_64.tar.gz && cd velocitydl && ./velocity-dl
+```
+
+Build the tarball locally with `npm run bundle:tar` (after `tauri build`).
+
 ---
 
 ## 📜 Available Scripts
@@ -211,7 +225,8 @@ npm run tauri build
 | `npm run check:deno` | Type-check Deno source files |
 | `npm run build:all` | Build Deno + Frontend (run before `tauri build`) |
 | `npm run tauri dev` | Full dev mode (Vite + Rust hot-reload) |
-| `npm run tauri build` | Production app bundle |
+| `npm run tauri build` | Production app bundle (msi, nsis, deb, rpm, appimage) |
+| `npm run bundle:tar` | Portable Linux `.tar.gz` (Arch/generic, after `tauri build`) |
 
 ---
 

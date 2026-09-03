@@ -23,6 +23,15 @@ export interface DownloadItem {
   completedAt?: number;
   error?: string;
   isPlaylist?: false;
+  /** Persisted download options — set at creation from the URLInput form
+   *  so the queue manager can forward them verbatim to the backend. */
+  saveDir?: string;
+  maxHeight?: number;
+  extractSubs?: boolean;
+  selectedSubtitles?: string[];
+  embedSubs?: boolean;
+  audioFormat?: string;
+  audioQuality?: string;
 }
 
 export interface PlaylistItem extends Omit<DownloadItem, 'isPlaylist'> {

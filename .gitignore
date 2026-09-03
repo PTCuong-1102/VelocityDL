@@ -13,12 +13,14 @@ node_modules
 # Build output
 dist
 dist-ssr
+release/
 *.local
 *.exe
 *.msi
 *.deb
 *.rpm
 *.AppImage
+*.tar.gz
 
 # Editor directories and files
 .vscode/*

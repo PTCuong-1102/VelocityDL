@@ -1,3 +1,4 @@
+use crate::proxy::apply_proxy_from_settings;
 use crate::state::AppState;
 use serde_json::Value;
 use tauri::{AppHandle, State, Emitter, Manager};
@@ -13,6 +14,7 @@ pub fn start_download(
     save_dir: String,
     options: Value,
 ) -> Result<(), String> {
+    apply_proxy_from_settings(&app);
     let options_str = serde_json::to_string(&options).map_err(|e| e.to_string())?;
 
     // Spawn Deno sidecar
@@ -96,11 +98,18 @@ pub fn cancel_download(
     state: State<'_, AppState>,
     id: String,
     file_paths: Vec<String>,
+    save_dir: String,
 ) -> Result<(), String> {
     let mut active = state.active_downloads.lock().map_err(|e| format!("Lock poisoned: {}", e))?;
     if let Some(child) = active.remove(&id) {
         let _ = child.kill();
     }
+    // No other downloads running → safe to sweep orphaned partial files
+    // (children whose outputPath was never reported) in this item's dir.
+    // With active downloads we only delete the known paths to avoid
+    // clobbering another download's .part files.
+    let no_active_left = active.is_empty();
+    drop(active);
 
     for path in file_paths {
         if !path.is_empty() {
@@ -117,11 +126,31 @@ pub fn cancel_download(
             let _ = std::fs::remove_file(&raw_ytdl);
         }
     }
+
+    if no_active_left && !save_dir.is_empty() {
+        if let Ok(entries) = std::fs::read_dir(&save_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if !p.is_file() {
+                    continue;
+                }
+                let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if name.ends_with(".part")
+                    || name.ends_with(".ytdl")
+                    || name.ends_with(".temp")
+                    || name.ends_with(".tmp")
+                {
+                    let _ = std::fs::remove_file(&p);
+                }
+            }
+        }
+    }
     Ok(())
 }
 
 #[tauri::command]
 pub async fn get_video_info(app: AppHandle, url: String) -> Result<Value, String> {
+    apply_proxy_from_settings(&app);
     let (mut rx, _child) = app
         .shell()
         .sidecar("deno-engine")

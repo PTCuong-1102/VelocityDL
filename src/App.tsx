@@ -4,8 +4,6 @@ import AppShell from './components/layout/AppShell';
 import DashboardPage from './pages/DashboardPage';
 import QueuePage from './pages/QueuePage';
 import FinishedPage from './pages/FinishedPage';
-import ScheduledPage from './pages/ScheduledPage';
-import BrowserPage from './pages/BrowserPage';
 import SettingsPage from './pages/SettingsPage';
 import useSettingsStore from './stores/settingsStore';
 import { invoke } from '@tauri-apps/api/core';
@@ -18,11 +16,20 @@ export const App: React.FC = () => {
   }, [settings.general.theme]);
 
   useEffect(() => {
-    // Load saved settings from Tauri config on app mount
+    // Load saved settings from Tauri config on app mount.
+    // Falls back to the OS default download dir when nothing was saved yet.
     const loadSettings = async () => {
       try {
         const savedSettings = await invoke<any>('load_settings');
         if (savedSettings) {
+          if (!savedSettings?.storage?.defaultDownloadPath) {
+            try {
+              const osDefault = await invoke<string | null>('get_default_download_path');
+              if (osDefault) savedSettings.storage.defaultDownloadPath = osDefault;
+            } catch {
+              // Keep empty — queue manager falls back to '.'.
+            }
+          }
           setAllSettings(savedSettings);
         }
       } catch (err) {
@@ -31,6 +38,15 @@ export const App: React.FC = () => {
     };
 
     loadSettings();
+
+    // Ask once for desktop-notification permission (honored per-download).
+    try {
+      if ('Notification' in window && Notification.permission === 'default') {
+        void Notification.requestPermission().catch(() => {});
+      }
+    } catch {
+      // Non-browser / restricted webview — ignore.
+    }
   }, [setAllSettings]);
 
   return (
@@ -40,8 +56,6 @@ export const App: React.FC = () => {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/queue" element={<QueuePage />} />
           <Route path="/finished" element={<FinishedPage />} />
-          <Route path="/scheduled" element={<ScheduledPage />} />
-          <Route path="/browser" element={<BrowserPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </AppShell>

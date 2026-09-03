@@ -31,6 +31,8 @@ export interface AnalyzedMetadata {
   availableQualities?: string[];
   availableSubtitles?: { lang: string; name: string; isAuto: boolean; }[];
   platform: 'youtube' | 'tiktok' | 'facebook' | 'instagram' | 'spotify' | 'other';
+  /** True when downloading requires login cookies (e.g. Facebook Stories). */
+  requiresCookies?: boolean;
   isPlaylist?: boolean;
   totalItems?: number;
   entries?: Array<{
@@ -674,7 +676,27 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
             boxShadow: 'var(--shadow-lg), var(--glow-primary)'
           }}
         >
-          {/* Media Info Section */}
+          {/* Cookie-gated content warning (e.g. Facebook Stories) */}
+          {analyzedInfo.requiresCookies && (
+            <div
+              className="flex-row gap-sm"
+              style={{
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 185, 95, 0.08)',
+                border: '1px solid rgba(255, 185, 95, 0.35)',
+                borderRadius: 'var(--radius-md)',
+                padding: '10px 14px',
+                fontSize: '12px',
+                color: 'var(--on-surface-variant)'
+              }}
+            >
+              <span className="icon" style={{ fontSize: '18px', color: 'var(--tertiary, #ffb95f)' }}>lock</span>
+              <span>
+                This link needs Facebook login cookies. Set <strong>Cookie Authentication</strong> in
+                Settings first, otherwise the download will fail.
+              </span>
+            </div>
+          )}          {/* Media Info Section */}
           <div 
             className="flex-row gap-lg" 
             style={{ 

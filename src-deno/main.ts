@@ -1,4 +1,4 @@
-import { ensureYtdlpInstalled, ensureFfmpegInstalled, ensureSpotdlInstalled, ensureGallerydlInstalled, ensureInstaloaderInstalled } from "./commands/update.ts";
+import { ensureYtdlpInstalled, ensureFfmpegInstalled, ensureSpotdlInstalled, ensureGallerydlInstalled, ensureInstaloaderInstalled, maybeAutoUpdateTools, touchToolsMarker } from "./commands/update.ts";
 import { getVideoInfo } from "./commands/info.ts";
 import { downloadMedia, DownloadOptions } from "./commands/download.ts";
 import { checkAppUpdate, downloadAppUpdate } from "./commands/appUpdate.ts";
@@ -16,29 +16,33 @@ async function main() {
   }
 
   try {
-    // 1. For core download commands, ensure dependencies are installed
-    if (command !== "update" && command !== "check-app-update" && command !== "download-app-update") {
-      await ensureYtdlpInstalled();
-      await ensureFfmpegInstalled();
-      await ensureSpotdlInstalled();
-      await ensureGallerydlInstalled();
-      await ensureInstaloaderInstalled();
-    }
-
-    // Apply global proxy settings if configured
+    // 1. Apply proxy FIRST so binary downloads (fetch) also go through it.
+    // Previously ensure*Installed() ran before this block and bypassed proxy.
     const settings = await getSettings();
-    const proxyAddress = settings?.engine?.proxyAddress;
+    const proxyAddress = settings?.engine?.proxyAddress?.trim();
     const proxyType = settings?.engine?.proxyType;
-    
+
     if (proxyAddress) {
       const prefix = proxyType === "SOCKS5" ? "socks5://" : "http://";
       let fullProxy = proxyAddress;
       if (!proxyAddress.startsWith("http://") && !proxyAddress.startsWith("socks5://") && !proxyAddress.startsWith("https://")) {
         fullProxy = `${prefix}${proxyAddress}`;
       }
-      Deno.env.set("HTTP_PROXY", fullProxy);
-      Deno.env.set("HTTPS_PROXY", fullProxy);
-      Deno.env.set("ALL_PROXY", fullProxy);
+      for (const key of ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"]) {
+        Deno.env.set(key, fullProxy);
+      }
+    }
+
+    // 2. For core download commands, ensure dependencies are installed.
+    // maybeAutoUpdateTools honors engine.autoUpdateYtdlp (weekly force-update).
+    if (command !== "update" && command !== "check-app-update" && command !== "download-app-update") {
+      await maybeAutoUpdateTools(settings?.engine?.autoUpdateYtdlp !== false);
+      await ensureYtdlpInstalled();
+      await ensureFfmpegInstalled();
+      await ensureSpotdlInstalled();
+      await ensureGallerydlInstalled();
+      await ensureInstaloaderInstalled();
+      await touchToolsMarker();
     }
 
     // 2. Command Router

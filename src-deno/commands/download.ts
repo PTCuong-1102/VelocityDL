@@ -1,12 +1,13 @@
-import { 
-  getYtdlpPath, 
-  getFfmpegDir, 
-  getSpotdlPath, 
-  getFfmpegPath, 
-  getGallerydlPath, 
-  getInstaloaderPath, 
-  getSettings 
+import {
+  getYtdlpPath,
+  getFfmpegDir,
+  getSpotdlPath,
+  getFfmpegPath,
+  getGallerydlPath,
+  getInstaloaderPath,
+  getSettings
 } from "../utils/paths.ts";
+import { readCookieHeader } from "../utils/cookies.ts";
 
 export interface DownloadOptions {
   maxHeight: number;
@@ -53,17 +54,6 @@ export async function downloadMedia(
 ): Promise<void> {
   const lowerUrl = url.toLowerCase();
 
-  // 1. Block Facebook stories
-  if (lowerUrl.includes("facebook.com/stories") || lowerUrl.includes("facebook.com/story")) {
-    console.log(JSON.stringify({
-      id,
-      status: "error",
-      error: "Facebook Stories are currently not supported due to security and API restrictions.",
-      progress: 0
-    }));
-    return;
-  }
-
   // Load Settings for Cookie configuration and Speed Limit
   const settings = await getSettings();
   const cookieSource = settings?.engine?.cookieSource || "none";
@@ -81,6 +71,14 @@ export async function downloadMedia(
       if (tempCookieFile) {
         finalCookieFile = tempCookieFile;
       }
+    }
+
+    // 1. Route Facebook Stories (/stories/ path) to the dedicated scraper.
+    // NOTE: story.php?story_fbid=... URLs stay on the yt-dlp route below —
+    // yt-dlp's FacebookIE matches story.php natively.
+    if (isFacebookStoryUrl(url)) {
+      await downloadFacebookStory(id, url, saveDir, finalCookieFile);
+      return;
     }
 
     // 2. Route Instagram Stories to Instaloader
@@ -439,6 +437,294 @@ async function downloadYtdlp(
   }
 }
 
+/**
+ * Sum of file sizes (bytes) under a directory — used as a REAL progress
+ * signal for tools (gallery-dl / instaloader) that don't print
+ * yt-dlp-style %(progress)s templates. Polled periodically while the
+ * child process runs; speed is derived from delta between polls.
+ */
+async function dirSizeBytes(dir: string): Promise<number> {
+  let total = 0;
+  try {
+    for await (const entry of Deno.readDir(dir)) {
+      const full = `${dir}/${entry.name}`;
+      try {
+        if (entry.isFile) {
+          total += (await Deno.stat(full)).size;
+        } else if (entry.isDirectory) {
+          total += await dirSizeBytes(full);
+        }
+      } catch (_) { /* file vanished mid-download — ignore */ }
+    }
+  } catch (_) { /* saveDir not created yet — ignore */ }
+  return total;
+}
+
+/** A line is treated as "one file completed" only if it looks like a media file path. */
+export function looksLikeMediaFile(line: string): boolean {
+  return /\.(mp4|mkv|webm|mov|m4a|mp3|opus|flac|ogg|wav|jpg|jpeg|png|webp)(\s|$|")/i.test(line);
+}
+
+function emitFileProgress(opts: {
+  id: string;
+  filesCompleted: number;
+  downloadedBytes: number;
+  speed: number;
+  outputPath?: string;
+}): number {
+  // Monotonic but honest: base 10% + 10% per completed file (cap 90),
+  // plus 1% per 5MB written (cap +5) so large single files still move.
+  const filePart = Math.min(80, opts.filesCompleted * 20);
+  const bytePart = Math.min(5, Math.floor(opts.downloadedBytes / (5 * 1024 * 1024)));
+  const progress = Math.min(95, 10 + filePart + bytePart);
+  console.log(JSON.stringify({
+    id: opts.id,
+    progress,
+    downloadedBytes: opts.downloadedBytes,
+    totalBytes: 0,
+    speed: Math.round(opts.speed),
+    eta: 0,
+    status: "downloading",
+    outputPath: opts.outputPath || undefined,
+  }));
+  return progress;
+}
+/**
+ * True for facebook.com/stories/<...> path URLs, which yt-dlp's FacebookIE
+ * does NOT match (falls through to generic → "Unsupported URL").
+ * story.php?story_fbid=... URLs are deliberately excluded — yt-dlp handles
+ * those natively on the default route.
+ */
+export function isFacebookStoryUrl(rawUrl: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  if (!parsed.hostname.toLowerCase().includes("facebook.com")) return false;
+  return /(^|\/)stories(\/|$|\?)/i.test(parsed.pathname);
+}
+
+/** Unescape JS-string encoding found in FB Relay payloads: \/ and \uXXXX. */
+export function unescapeJsString(s: string): string {
+  return s
+    .replace(/\\\//g, "/")
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, h: string) =>
+      String.fromCharCode(parseInt(h, 16)))
+    .replace(/\\"/g, '"');
+}
+
+export interface FacebookStoryMedia {
+  videos: string[];
+  images: string[];
+}
+
+/** Extract direct media URLs from a Facebook story page HTML. */
+export function extractFacebookStoryMedia(html: string): FacebookStoryMedia {
+  const pick = (re: RegExp): string[] => {
+    const out: string[] = [];
+    for (const m of html.matchAll(re)) {
+      const u = unescapeJsString(m[1]);
+      if ((u.startsWith("http://") || u.startsWith("https://")) && !out.includes(u)) {
+        out.push(u);
+      }
+    }
+    return out;
+  };
+
+  const videos = [
+    ...pick(/"playable_url_quality_hd"\s*:\s*"([^"]+)"/g),
+    ...pick(/"playable_url"\s*:\s*"([^"]+)"/g),
+    ...pick(/<meta[^>]+property="og:video(?::url)?"[^>]+content="([^"]+)"/gi),
+  ];
+  const images = videos.length === 0
+    ? [
+      ...pick(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/gi),
+      ...pick(/"hd_src"\s*:\s*"([^"]+)"/g),
+      ...pick(/"display_url"\s*:\s*"([^"]+)"/g),
+    ]
+    : [];
+  return { videos, images };
+}
+
+const FB_CHROME_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+/** Mobile/mbasic variants render simpler HTML that is easier to parse. */
+export function facebookStoryPageVariants(rawUrl: string): string[] {
+  try {
+    const variants = [rawUrl];
+    const mobile = new URL(rawUrl);
+    mobile.hostname = "m.facebook.com";
+    variants.push(mobile.toString());
+    return variants;
+  } catch {
+    return [rawUrl];
+  }
+}
+
+async function fetchFacebookPage(pageUrl: string, cookieHeader: string): Promise<string> {
+  const resp = await fetch(pageUrl, {
+    headers: {
+      "Cookie": cookieHeader,
+      "User-Agent": FB_CHROME_UA,
+      "Accept": "text/html,application/xhtml+xml",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Referer": "https://www.facebook.com/",
+    },
+    redirect: "follow",
+  });
+  // fetch follows redirects: a landing on login.php means cookies are bad/expired.
+  if (resp.url.includes("login.php")) {
+    throw new Error(
+      "Facebook rejected the login cookies (redirected to login). " +
+      "Re-login in your browser or re-export cookies.txt, then retry.",
+    );
+  }
+  if (!resp.ok) {
+    throw new Error(`Facebook returned HTTP ${resp.status} for the story page.`);
+  }
+  const html = await resp.text();
+  if (html.includes("login.php") && !html.includes("playable_url")) {
+    throw new Error(
+      "Facebook requires login to view this story. " +
+      "Set Cookie Authentication in Settings, then retry.",
+    );
+  }
+  return html;
+}
+
+/** Stream-download a URL to disk with real byte progress events. */
+async function downloadCdnFile(
+  id: string,
+  fileUrl: string,
+  destPath: string,
+  cookieHeader: string,
+  outputPathForEvents: string,
+): Promise<void> {
+  const resp = await fetch(fileUrl, {
+    headers: {
+      "Cookie": cookieHeader,
+      "User-Agent": FB_CHROME_UA,
+      "Referer": "https://www.facebook.com/",
+    },
+  });
+  if (!resp.ok || !resp.body) {
+    throw new Error(`CDN download failed with HTTP ${resp.status}.`);
+  }
+  const totalBytes = parseInt(resp.headers.get("content-length") || "0", 10) || 0;
+  const file = await Deno.open(destPath, { write: true, create: true, truncate: true });
+
+  const reader = resp.body.getReader();
+  const writer = file.writable.getWriter();
+  let downloaded = 0;
+  let lastEmit = 0;
+  const start = Date.now();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      await writer.write(value);
+      downloaded += value.length;
+      const now = Date.now();
+      if (now - lastEmit >= 200 || (totalBytes > 0 && downloaded >= totalBytes)) {
+        lastEmit = now;
+        const elapsed = Math.max(1, (now - start) / 1000);
+        console.log(JSON.stringify({
+          id,
+          progress: totalBytes > 0 ? Math.min(99, (downloaded / totalBytes) * 100) : 10,
+          downloadedBytes: downloaded,
+          totalBytes,
+          speed: Math.round(downloaded / elapsed),
+          eta: 0,
+          status: "downloading",
+          outputPath: outputPathForEvents,
+        }));
+      }
+    }
+  } finally {
+    try { await writer.close(); } catch (_) { /* ignore */ }
+  }
+}
+
+/**
+ * Download a Facebook Story by scraping the story page with the user's
+ * login cookies (yt-dlp stock cannot handle /stories/ URLs; cookies are
+ * mandatory — even public stories redirect to login without them).
+ */
+async function downloadFacebookStory(
+  id: string,
+  url: string,
+  saveDir: string,
+  cookieFilePath: string | null,
+): Promise<void> {
+  if (!cookieFilePath) {
+    throw new Error(
+      "Facebook Stories require login cookies. Go to Settings → Cookie " +
+      "Authentication, pick your browser (or a cookies.txt file), then retry.",
+    );
+  }
+  const cookieHeader = await readCookieHeader(cookieFilePath, "facebook.com");
+  if (!cookieHeader) {
+    throw new Error(
+      "No Facebook cookies found. Make sure you are logged into Facebook " +
+      "in the selected browser (close it and retry), or re-export cookies.txt.",
+    );
+  }
+
+  console.log(JSON.stringify({
+    id, progress: 5, status: "downloading",
+    downloadedBytes: 0, totalBytes: 0, speed: 0, eta: 0,
+  }));
+
+  // 1. Fetch story HTML (desktop first, mobile fallback).
+  let html = "";
+  let lastErr = "";
+  for (const variant of facebookStoryPageVariants(url)) {
+    try {
+      html = await fetchFacebookPage(variant, cookieHeader);
+      if (html.includes("playable_url") || html.includes("og:video") || html.includes("og:image")) break;
+    } catch (err) {
+      lastErr = err instanceof Error ? err.message : String(err);
+      // Auth errors are definitive — don't mask them with fallbacks.
+      if (lastErr.includes("login")) throw err;
+    }
+  }
+  if (!html) throw new Error(lastErr || "Could not load the story page.");
+
+  // 2. Extract direct media URLs.
+  const { videos, images } = extractFacebookStoryMedia(html);
+  const targets = videos.length > 0
+    ? videos.map((u) => ({ url: u, ext: "mp4" }))
+    : images.map((u) => ({ url: u, ext: u.includes(".png") ? "png" : "jpg" }));
+  if (targets.length === 0) {
+    // Distinguish expired/missing stories from parser breakage.
+    if (/This content isn't available|content not found|story.*(expired|unavailable)/i.test(html)) {
+      throw new Error("This story is unavailable (deleted or expired after 24h).");
+    }
+    throw new Error(
+      "No playable media found on the story page — Facebook may have changed " +
+      "its page format. Please update VelocityDL and retry.",
+    );
+  }
+
+  // 3. Download each segment.
+  await Deno.mkdir(saveDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  let outputPath = "";
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i];
+    const name = targets.length > 1
+      ? `facebook_story_${stamp}_part${i + 1}.${t.ext}`
+      : `facebook_story_${stamp}.${t.ext}`;
+    outputPath = `${saveDir}/${name}`;
+    await downloadCdnFile(id, t.url, outputPath, cookieHeader, outputPath);
+  }
+
+  console.log(JSON.stringify({ id, progress: 100, status: "finished", outputPath }));
+}
+
 async function downloadInstagramStory(
   id: string,
   url: string,
@@ -492,18 +778,48 @@ async function downloadInstagramStory(
   const stderrReader = child.stderr.getReader();
   
   let stderrOutput = "";
+  // Instaloader logs progress to STDERR — scan it for completed media files too.
+  let filesCompleted = 0;
+  let outputPath = "";
+  const baseBytes = await dirSizeBytes(saveDir);
+  let lastBytes = baseBytes;
+  let lastTime = Date.now();
   const stderrPromise = (async () => {
     while (true) {
       const { value, done } = await stderrReader.read();
       if (done) break;
       const text = decoder.decode(value, { stream: true });
       stderrOutput = (stderrOutput + text).slice(-4096);
+      for (const rawLine of text.split(/[\r\n]+/)) {
+        const trimmed = rawLine.trim();
+        if (!trimmed) continue;
+        if (trimmed.includes(username + "/")) {
+          const pathMatch = trimmed.match(new RegExp(`(${username}/.*\\.(?:mp4|jpg|jpeg|png|json|txt))`, "i"));
+          if (pathMatch) {
+            outputPath = `${saveDir}/${pathMatch[1].substring(username.length + 1)}`;
+          }
+        }
+        if (looksLikeMediaFile(trimmed)) {
+          filesCompleted++;
+          const now = Date.now();
+          const currentBytes = await dirSizeBytes(saveDir);
+          const dt = Math.max(1, (now - lastTime) / 1000);
+          const speed = Math.max(0, (currentBytes - lastBytes) / dt);
+          lastBytes = currentBytes;
+          lastTime = now;
+          emitFileProgress({
+            id,
+            filesCompleted,
+            downloadedBytes: Math.max(0, currentBytes - baseBytes),
+            speed,
+            outputPath,
+          });
+        }
+      }
     }
   })();
 
   let buffer = "";
-  let progress = 10;
-  let outputPath = "";
 
   while (true) {
     const { value, done } = await stdoutReader.read();
@@ -524,14 +840,21 @@ async function downloadInstagramStory(
         }
       }
 
-      if (trimmed.includes(".jpg") || trimmed.includes(".mp4")) {
-        progress = Math.min(progress + 15, 95);
-        console.log(JSON.stringify({
+      if (looksLikeMediaFile(trimmed)) {
+        filesCompleted++;
+        const now = Date.now();
+        const currentBytes = await dirSizeBytes(saveDir);
+        const dt = Math.max(1, (now - lastTime) / 1000);
+        const speed = Math.max(0, (currentBytes - lastBytes) / dt);
+        lastBytes = currentBytes;
+        lastTime = now;
+        emitFileProgress({
           id,
-          progress,
-          status: "downloading",
-          outputPath: outputPath || undefined
-        }));
+          filesCompleted,
+          downloadedBytes: Math.max(0, currentBytes - baseBytes),
+          speed,
+          outputPath,
+        });
       }
     }
   }
@@ -564,6 +887,7 @@ async function downloadGallerydl(
   const args: string[] = [
     "--destination", saveDir,
     "-o", "directory=[]",
+    "--verbose",
   ];
 
   if (cookieFilePath) {
@@ -598,18 +922,49 @@ async function downloadGallerydl(
   const stderrReader = child.stderr.getReader();
   
   let stderrOutput = "";
+  let filesCompleted = 0;
+  let outputPath = "";
+  const baseBytes = await dirSizeBytes(saveDir);
+  let lastBytes = baseBytes;
+  let lastTime = Date.now();
+  const handleGalleryLine = async (trimmed: string) => {
+    if (!trimmed) return;
+    // gallery-dl --verbose prints completed file paths; only those count.
+    if (trimmed.startsWith(saveDir) || looksLikeMediaFile(trimmed)) {
+      if (looksLikeMediaFile(trimmed) || trimmed.startsWith(saveDir)) {
+        outputPath = trimmed.length < 1024 ? trimmed : outputPath;
+      }
+      if (looksLikeMediaFile(trimmed)) {
+        filesCompleted++;
+        const now = Date.now();
+        const currentBytes = await dirSizeBytes(saveDir);
+        const dt = Math.max(1, (now - lastTime) / 1000);
+        const speed = Math.max(0, (currentBytes - lastBytes) / dt);
+        lastBytes = currentBytes;
+        lastTime = now;
+        emitFileProgress({
+          id,
+          filesCompleted,
+          downloadedBytes: Math.max(0, currentBytes - baseBytes),
+          speed,
+          outputPath,
+        });
+      }
+    }
+  };
   const stderrPromise = (async () => {
     while (true) {
       const { value, done } = await stderrReader.read();
       if (done) break;
       const text = decoder.decode(value, { stream: true });
       stderrOutput = (stderrOutput + text).slice(-4096);
+      for (const rawLine of text.split(/[\r\n]+/)) {
+        await handleGalleryLine(rawLine.trim());
+      }
     }
   })();
 
   let buffer = "";
-  let progress = 10;
-  let outputPath = "";
 
   while (true) {
     const { value, done } = await stdoutReader.read();
@@ -620,20 +975,7 @@ async function downloadGallerydl(
     buffer = lines.pop() || "";
 
     for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-
-      if (trimmed.startsWith(saveDir) || trimmed.includes(":\\") || trimmed.includes("/")) {
-        outputPath = trimmed;
-      }
-
-      progress = Math.min(progress + 15, 95);
-      console.log(JSON.stringify({
-        id,
-        progress,
-        status: "downloading",
-        outputPath: outputPath || undefined
-      }));
+      await handleGalleryLine(line.trim());
     }
   }
 

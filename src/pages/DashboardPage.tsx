@@ -7,13 +7,24 @@ import PlaylistCard from '../components/ui/PlaylistCard';
 import GlassPanel from '../components/ui/GlassPanel';
 import { useDownloadStore } from '../stores/downloadStore';
 import { useDownload } from '../hooks/useDownload';
+import useToastStore from '../stores/toastStore';
 import { Platform, isPlaylistItem } from '../types/download';
 import { formatBytes } from '../utils/format';
+
+const PLATFORM_URLS: Record<Platform, string> = {
+  youtube: 'https://www.youtube.com',
+  spotify: 'https://open.spotify.com',
+  tiktok: 'https://www.tiktok.com',
+  facebook: 'https://www.facebook.com',
+  instagram: 'https://www.instagram.com',
+  other: 'https://www.youtube.com',
+};
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { downloads } = useDownloadStore();
   const { startDownload, pauseDownload, resumeDownload, cancelDownload, retryDownload } = useDownload();
+  const { addToast } = useToastStore();
 
   // Show only active/downloading/queued/paused items, max 3
   const activeItems = downloads
@@ -43,9 +54,19 @@ export const DashboardPage: React.FC = () => {
     navigate('/queue');
   };
 
-  const handlePlatformClick = (platform: Platform) => {
-    console.log(`Quick download for ${platform}`);
-    navigate('/browser');
+  const handlePlatformClick = async (platform: Platform) => {
+    // Open the platform homepage in the OS browser so users can grab links.
+    const target = PLATFORM_URLS[platform] ?? PLATFORM_URLS.other;
+    try {
+      const { openUrl } = await import('@tauri-apps/plugin-opener');
+      await openUrl(target);
+    } catch {
+      try {
+        window.open(target, '_blank', 'noopener,noreferrer');
+      } catch {
+        addToast('error', `Could not open ${target}`);
+      }
+    }
   };
 
   return (
@@ -54,7 +75,7 @@ export const DashboardPage: React.FC = () => {
       <div>
         <h1>VelocityDL</h1>
         <p className="text-muted mt-sm" style={{ fontSize: '14px' }}>
-          Next-generation high-speed video downloader engine powered by Deno & Tauri.
+          Next-generation high-speed video downloader engine powered by Deno &amp; Tauri.
         </p>
       </div>
 
@@ -159,6 +180,7 @@ export const DashboardPage: React.FC = () => {
                   onPause={pauseDownload}
                   onResume={resumeDownload}
                   onCancel={cancelDownload}
+                  onRetry={retryDownload}
                 />
               ) : (
                 <DownloadCard 

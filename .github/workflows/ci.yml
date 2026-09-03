@@ -33,6 +33,8 @@ jobs:
           deno-version: v2.x
       - name: Type check Deno
         run: npm run check:deno
+      - name: Test Deno engine
+        run: npm run test:deno
 
   cargo-check:
     name: Rust Backend Cargo Check

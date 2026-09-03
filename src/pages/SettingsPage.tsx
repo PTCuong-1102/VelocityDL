@@ -15,7 +15,10 @@ export const SettingsPage: React.FC = () => {
   const { addToast } = useToastStore();
 
   // App Update States
-  const [currentVersion, setCurrentVersion] = useState('0.4.0');
+  const [currentVersion, setCurrentVersion] = useState('0.6.0');
+  // Tool-update states
+  const [toolsStatus, setToolsStatus] = useState<'idle' | 'updating' | 'ready' | 'error'>('idle');
+  const [toolsMsg, setToolsMsg] = useState('');
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'no-update' | 'downloading' | 'ready' | 'error'>('idle');
   const [updateInfo, setUpdateInfo] = useState<{
     latestVersion: string;
@@ -29,7 +32,26 @@ export const SettingsPage: React.FC = () => {
 
   useEffect(() => {
     getVersion().then(setCurrentVersion).catch(console.error);
+    // Sync the launch-on-boot toggle with the OS state.
+    invoke<boolean>('is_launch_on_boot')
+      .then((enabled) => {
+        if (enabled !== settings.general.launchOnBoot) {
+          updateSetting('general', 'launchOnBoot', enabled);
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Live tool-update messages from the sidecar (update_tools command).
+  useTauriEvent<any>('info-progress', (event) => {
+    const payload = event.payload;
+    if (payload.status === 'updating' && payload.message && toolsStatus === 'updating') {
+      setToolsMsg(payload.message);
+    } else if (payload.status === 'ready' && payload.message && toolsStatus === 'updating') {
+      setToolsMsg(payload.message);
+    }
+  });
 
   // Listen for update download progress events from sidecar
   useTauriEvent<any>('update-progress', (event) => {
@@ -99,9 +121,35 @@ export const SettingsPage: React.FC = () => {
     }
   };
 
+  const handleUpdateTools = async () => {
+    setToolsStatus('updating');
+    setToolsMsg('Starting tool update...');
+    try {
+      await invoke('update_tools');
+      setToolsStatus('ready');
+      setToolsMsg('Download tools are up to date.');
+      addToast('success', 'Download tools updated successfully.');
+    } catch (err) {
+      console.error(err);
+      setToolsStatus('error');
+      setToolsMsg(String(err));
+      addToast('error', `Tool update failed: ${String(err)}`);
+    }
+  };
+
+  const handleLaunchOnBoot = async (enabled: boolean) => {
+    updateSetting('general', 'launchOnBoot', enabled);
+    try {
+      await invoke('set_launch_on_boot', { enabled });
+    } catch (err) {
+      console.error(err);
+      updateSetting('general', 'launchOnBoot', !enabled);
+      addToast('error', `Could not change startup setting: ${String(err)}`);
+    }
+  };
+
   const handleBrowsePath = async () => {
     try {
-      // In Phase 10 we'll implement browse_directory.
       const selectedPath = await invoke<string | null>('browse_directory');
       if (selectedPath) {
         updateSetting('storage', 'defaultDownloadPath', selectedPath);
@@ -324,6 +372,30 @@ export const SettingsPage: React.FC = () => {
                   onChange={(e) => updateSetting('engine', 'autoUpdateYtdlp', e.target.checked)}
                 />
               </div>
+
+              <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
+
+              {/* Manual tool update */}
+              <div className="flex-col gap-sm">
+                <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div className="flex-col" style={{ gap: '4px' }}>
+                    <span style={{ fontWeight: 500, fontSize: '13px' }}>Download Tools Version</span>
+                    <span className="text-muted" style={{ fontSize: '11px' }}>
+                      {toolsStatus === 'idle' ? 'yt-dlp, FFmpeg, spotDL, gallery-dl, instaloader.' : toolsMsg}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    onClick={handleUpdateTools}
+                    style={{ height: '38px', whiteSpace: 'nowrap' }}
+                  >
+                    {toolsStatus === 'updating' ? 'Updating…' : 'Update Tools Now'}
+                  </Button>
+                </div>
+                {toolsStatus === 'updating' && (
+                  <span className="text-muted" style={{ fontSize: '11px' }}>{toolsMsg}</span>
+                )}
+              </div>
             </div>
           </GlassPanel>
 
@@ -331,7 +403,7 @@ export const SettingsPage: React.FC = () => {
           <GlassPanel>
             <h2 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="icon text-primary-color">folder</span>
-              Storage & Save Path
+              Storage &amp; Save Path
             </h2>
 
             <div className="flex-col gap-md">
@@ -374,7 +446,7 @@ export const SettingsPage: React.FC = () => {
           <GlassPanel style={{ height: '100%' }}>
             <h2 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="icon text-tertiary-color">palette</span>
-              General & Themes
+              General &amp; Themes
             </h2>
 
             <div className="flex-col gap-md">
@@ -397,6 +469,34 @@ export const SettingsPage: React.FC = () => {
                     System Sync
                   </button>
                 </div>
+              </div>
+
+              <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
+
+              {/* Launch on boot */}
+              <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="flex-col" style={{ gap: '4px' }}>
+                  <span style={{ fontWeight: 500, fontSize: '13px' }}>Launch on Boot</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>Start VelocityDL automatically at login.</span>
+                </div>
+                <Toggle
+                  checked={settings.general.launchOnBoot}
+                  onChange={(e) => handleLaunchOnBoot(e.target.checked)}
+                />
+              </div>
+
+              <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
+
+              {/* Desktop notifications */}
+              <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="flex-col" style={{ gap: '4px' }}>
+                  <span style={{ fontWeight: 500, fontSize: '13px' }}>Desktop Notifications</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>OS alerts when downloads finish or fail.</span>
+                </div>
+                <Toggle
+                  checked={settings.general.desktopNotifications}
+                  onChange={(e) => updateSetting('general', 'desktopNotifications', e.target.checked)}
+                />
               </div>
             </div>
           </GlassPanel>
@@ -472,7 +572,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
 
                   <Button variant="primary" onClick={handleDownloadUpdate} style={{ width: '100%', marginTop: '4px' }}>
-                    Download & Install
+                    Download &amp; Install
                   </Button>
                 </div>
               )}
@@ -508,7 +608,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
                   <span className="text-muted" style={{ fontSize: '11px' }}>The update has been downloaded. Ready to install.</span>
                   <Button variant="primary" onClick={handleInstallUpdate} style={{ width: '100%', marginTop: '4px' }}>
-                    Restart & Install
+                    Restart &amp; Install
                   </Button>
                 </div>
               )}

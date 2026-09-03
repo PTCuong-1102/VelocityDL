@@ -19,7 +19,10 @@ export const useToastStore = create<ToastState>((set) => ({
   toasts: [],
 
   addToast: (type, message, duration = 4000) => {
-    const id = Math.random().toString(36).substring(2, 10);
+    const id =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
     set((state) => {
       const nextToasts = [...state.toasts, { id, type, message, duration }];
       // Limit to max 5 toasts on screen to prevent rendering overhead/lag

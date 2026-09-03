@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 
 /**
  * Global keyboard shortcuts for VelocityDL.
- * 
- * Ctrl+1/2/3/4/5 → Navigate between pages
- * Escape → Close modals or go back to Dashboard
+ *
+ * Ctrl+1/2/3/4 → Dashboard / Queue / Finished / Settings
+ * Escape → back to Dashboard
  */
 export function useKeyboardShortcuts() {
   const navigate = useNavigate();
@@ -39,6 +39,12 @@ export function useKeyboardShortcuts() {
             navigate('/settings');
             break;
         }
+        return;
+      }
+
+      // Escape → back to Dashboard (unless already there)
+      if (e.key === 'Escape' && window.location.hash !== '#/') {
+        navigate('/');
       }
     };
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useUIStore } from '../../stores/uiStore';
 
@@ -6,16 +6,17 @@ export const SearchBar: React.FC = () => {
   const location = useLocation();
   const { searchQuery, setSearchQuery } = useUIStore();
 
+  // Don't leak a filter from one page into another.
+  useEffect(() => {
+    setSearchQuery('');
+  }, [location.pathname, setSearchQuery]);
+
   const getPlaceholder = () => {
     switch (location.pathname) {
       case '/queue':
         return 'Search queue...';
       case '/finished':
         return 'Search finished downloads...';
-      case '/scheduled':
-        return 'Search scheduled tasks...';
-      case '/browser':
-        return 'Enter site name or URL...';
       case '/settings':
         return 'Search settings...';
       default:
@@ -23,7 +24,9 @@ export const SearchBar: React.FC = () => {
     }
   };
 
-  const isVisible = location.pathname !== '/'; // Hide search on main dashboard hero
+  // Only queue + finished lists are filterable; hide elsewhere
+  // (dashboard hero, settings) instead of showing a dead input.
+  const isVisible = location.pathname === '/queue' || location.pathname === '/finished';
 
   if (!isVisible) return <div style={{ flexGrow: 1 }} />;
 

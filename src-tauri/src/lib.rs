@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod proxy;
 pub mod state;
 
 use state::AppState;
@@ -14,6 +15,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         // Register Commands
         .invoke_handler(tauri::generate_handler![
             commands::download::start_download,
@@ -25,10 +30,13 @@ pub fn run() {
             commands::settings::browse_cookie_file,
             commands::settings::load_settings,
             commands::settings::save_settings,
+            commands::settings::set_launch_on_boot,
+            commands::settings::is_launch_on_boot,
             commands::filesystem::open_file,
             commands::filesystem::open_folder,
             commands::update::check_app_update,
             commands::update::start_app_update_download,
+            commands::update::update_tools,
             commands::update::exit_app,
         ])
         // Kill all active downloads when the window is closed

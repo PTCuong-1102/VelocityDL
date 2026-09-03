@@ -11,18 +11,21 @@ interface PlaylistCardProps {
   onPause?: (id: string) => void;
   onResume?: (id: string) => void;
   onCancel?: (id: string) => void;
+  onRetry?: (id: string) => void;
 }
 
 export const PlaylistCard: React.FC<PlaylistCardProps> = ({
   item,
   onPause,
   onResume,
-  onCancel
+  onCancel,
+  onRetry
 }) => {
   const [expanded, setExpanded] = useState(false);
 
   const isDownloading = item.status === 'downloading';
   const isPaused = item.status === 'paused';
+  const isError = item.status === 'error';
   const platformColor = getPlatformColor(item.platform);
 
   return (
@@ -139,6 +142,17 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
               onClick={() => onCancel(item.id)}
             >
               <span className="icon">close</span>
+            </button>
+          )}
+
+          {isError && onRetry && (
+            <button
+              className="btn btn-ghost btn-icon flex-center"
+              style={{ width: '32px', height: '32px', color: 'var(--secondary)' }}
+              onClick={() => onRetry(item.id)}
+              title="Retry download"
+            >
+              <span className="icon">refresh</span>
             </button>
           )}
 

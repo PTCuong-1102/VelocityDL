@@ -1,0 +1,31 @@
+# Maintainer: PTCuong-1102 <https://github.com/PTCuong-1102/VelocityDL>
+# Binary package for Arch Linux — extracts the official .deb built by Tauri
+# (recommended approach per https://tauri.app/distribute/aur/).
+#
+# Usage:
+#   makepkg -si
+# Then regenerate .SRCINFO before pushing to AUR:
+#   makepkg --printsrcinfo > .SRCINFO
+
+pkgname=velocitydl
+pkgver=0.6.0
+pkgrel=1
+pkgdesc="Next-generation high-speed video downloader — powered by Deno & Tauri"
+arch=('x86_64')
+url="https://github.com/PTCuong-1102/VelocityDL"
+license=('MIT')
+depends=('cairo' 'desktop-file-utils' 'gdk-pixbuf2' 'glib2' 'gtk3'
+         'hicolor-icon-theme' 'libsoup3' 'pango' 'webkit2gtk-4.1')
+optdepends=('python: Instagram Stories support via instaloader'
+            'python-pip: auto-install instaloader on first run')
+options=('!strip' '!debug')
+install=${pkgname}.install
+source_x86_64=("${url}/releases/download/v${pkgver}/VelocityDL_${pkgver}_amd64.deb")
+# Fill in after `makepkg -g` on release day, e.g.:
+# sha256sums_x86_64=('aaa...bbb')
+sha256sums_x86_64=('SKIP')
+
+package() {
+  # Extract debian payload into $pkgdir (data.tar.* inside the .deb)
+  tar -xvf data.tar.* -C "${pkgdir}"
+}

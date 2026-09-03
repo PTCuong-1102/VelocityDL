@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useDownloadStore } from '../stores/downloadStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useToastStore } from '../stores/toastStore';
+import { buildSidecarOptions } from '../utils/downloadOptions';
 import { isPlaylistItem } from '../types/download';
 
 /**
@@ -45,34 +46,32 @@ export const useQueueManager = () => {
           // Mark as processed to prevent duplicate triggers
           processedIds.current.add(item.id);
 
-          // Optimistically mark as downloading
-          updateProgress({
-            id: item.id,
-            progress: 0,
-            downloadedBytes: 0,
-            totalBytes: 0,
-            speed: 0,
-            eta: 0,
-            status: 'downloading'
-          });
-
-          // Reconstruct options and saveDir
+          // Reconstruct saveDir (persist it for later cancel cleanup)
           let saveDir = settings.storage.defaultDownloadPath || '.';
           if (isPlaylistItem(item) && settings.storage.createSubfolders && item.title) {
             const safeTitle = item.title.replace(/[<>:"\/\\|?*]+/g, '_').trim() || 'Playlist';
             saveDir = `${saveDir}/${safeTitle}`;
           }
+          useDownloadStore.setState((state) => ({
+            downloads: state.downloads.map((d) =>
+              d.id === item.id ? { ...d, saveDir } : d
+            ),
+          }));
 
-          const qualityMatch = item.quality.match(/(\d+)(?:p|$)/i) || item.quality.match(/x(\d+)/);
-          const maxHeight = qualityMatch ? parseInt(qualityMatch[1]) : 1080;
-          const isAudio = item.mediaType === 'audio';
-          const options = {
-            maxHeight: isAudio ? 0 : maxHeight,
-            extractSubs: false,
-            audioOnly: isAudio,
-            audioFormat: isAudio ? item.format.toLowerCase() : undefined,
-            audioQuality: isAudio ? (item.quality.includes('kbps') ? item.quality.replace('kbps', 'k') : '320k') : undefined
-          };
+          // Forward the exact user options (incl. subtitles) to the backend.
+          const options = buildSidecarOptions(item);
+
+          // Optimistically mark as downloading, preserving current progress
+          // so resume doesn't visually restart from 0%.
+          updateProgress({
+            id: item.id,
+            progress: item.progress,
+            downloadedBytes: item.downloadedBytes,
+            totalBytes: item.totalBytes,
+            speed: 0,
+            eta: 0,
+            status: 'downloading'
+          });
 
           try {
             addToast('info', `Starting download: ${item.title || item.url}`);

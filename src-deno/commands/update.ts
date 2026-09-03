@@ -1,3 +1,4 @@
+import * as path from "jsr:@std/path";
 import { getYtdlpPath, getBinDir, getFfmpegPath, getFfprobePath, getFfmpegDir, getSpotdlPath, getGallerydlPath, getInstaloaderPath } from "../utils/paths.ts";
 
 export async function ensureYtdlpInstalled(forceUpdate = false): Promise<string> {
@@ -64,6 +65,90 @@ export async function ensureYtdlpInstalled(forceUpdate = false): Promise<string>
     }));
     throw err;
   }
+}
+
+/**
+ * Generic integrity gate for binaries that don't publish a SHA2-256SUMS file
+ * (spotDL, gallery-dl, FFmpeg archives). Enforces minimum size + executable
+ * bit so truncated / HTML-error-page downloads fail fast instead of
+ * surfacing later as cryptic "spawn failed" errors.
+ */
+export async function verifyBinaryIntegrity(
+  binaryPath: string,
+  opts: { minSizeBytes: number; label: string },
+): Promise<void> {
+  const stat = await Deno.stat(binaryPath);
+  if (!stat.isFile) {
+    throw new Error(`${opts.label}: not a file at ${binaryPath}`);
+  }
+  if (stat.size < opts.minSizeBytes) {
+    throw new Error(
+      `${opts.label}: file too small (${stat.size} bytes, expected >= ${opts.minSizeBytes}). ` +
+        `Likely a truncated download or an HTML error page.`,
+    );
+  }
+  if (Deno.build.os !== "windows") {
+    try {
+      await Deno.chmod(binaryPath, 0o755);
+    } catch (_) { /* ignore chmod failures on exotic FS */ }
+    // Magic-byte sanity: ELF on Linux, Mach-O (CF FA ED FE) on macOS.
+    const head = new Uint8Array(4);
+    const f = await Deno.open(binaryPath, { read: true });
+    try {
+      await f.read(head);
+    } finally {
+      f.close();
+    }
+    const isElf = head[0] === 0x7f && head[1] === 0x45 && head[2] === 0x4c && head[3] === 0x46;
+    const isMachO = (head[0] === 0xcf && head[1] === 0xfa) || (head[0] === 0xfe && head[1] === 0xed);
+    const isScript = head[0] === 0x23 && head[1] === 0x21; // #! (pip shim / .bin wrapper)
+    if (Deno.build.os === "linux" && !isElf && !isScript) {
+      throw new Error(`${opts.label}: unexpected magic bytes — not a Linux binary/script.`);
+    }
+    if (Deno.build.os === "darwin" && !isMachO && !isElf && !isScript) {
+      throw new Error(`${opts.label}: unexpected magic bytes — not a macOS binary/script.`);
+    }
+  }
+}
+
+/**
+ * Best-effort SHA-256 check against a `<binary-url>.sha256` sidecar file
+ * when the publisher provides one. Returns true if verified, false if the
+ * sidecar is absent (caller falls back to verifyBinaryIntegrity).
+ * Throws on MISMATCH.
+ */
+export async function tryVerifySidecarSha256(
+  binaryPath: string,
+  downloadUrl: string,
+  label: string,
+): Promise<boolean> {
+  let expected = "";
+  for (const candidate of [`${downloadUrl}.sha256`, `${downloadUrl}.sha256sum`]) {
+    try {
+      const res = await fetch(candidate);
+      if (!res.ok) continue;
+      const text = (await res.text()).trim();
+      const first = text.split(/\s+/)[0].toLowerCase();
+      if (/^[0-9a-f]{64}$/.test(first)) {
+        expected = first;
+        break;
+      }
+    } catch (_) { /* try next candidate */ }
+  }
+  if (!expected) return false;
+
+  const fileData = await Deno.readFile(binaryPath);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", fileData);
+  const actual = Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  if (actual !== expected) {
+    throw new Error(
+      `${label}: checksum mismatch!\n  Expected: ${expected}\n  Actual:   ${actual}`,
+    );
+  }
+  console.log(JSON.stringify({ status: "info", message: `Checksum verified OK for ${label}.` }));
+  return true;
 }
 
 /**
@@ -175,12 +260,15 @@ export async function ensureFfmpegInstalled(forceUpdate = false): Promise<string
       await downloadFfmpegUnix(ffmpegDir);
     }
 
-    // Verify the binaries exist after extraction
-    const ffmpegStat = await Deno.stat(ffmpegPath);
-    const ffprobeStat = await Deno.stat(ffprobePath);
-
-    if (!ffmpegStat.isFile || !ffprobeStat.isFile) {
-      throw new Error("FFmpeg extraction failed: binaries not found after extraction.");
+    // Verify the binaries exist after extraction + integrity gate
+    // (BtbN publishes .sha256 sidecars, but filenames vary per build;
+    // size+magic check catches truncated archives reliably).
+    await verifyBinaryIntegrity(ffmpegPath, { minSizeBytes: 10_000_000, label: "ffmpeg" });
+    try {
+      await verifyBinaryIntegrity(ffprobePath, { minSizeBytes: 5_000_000, label: "ffprobe" });
+    } catch (_) {
+      // Some macOS evermeet zips ship ffmpeg only — ffprobe is optional there.
+      if (Deno.build.os !== "darwin") throw new Error("FFmpeg extraction failed: ffprobe missing.");
     }
 
     console.log(JSON.stringify({
@@ -448,6 +536,12 @@ export async function ensureSpotdlInstalled(forceUpdate = false): Promise<string
       await Deno.chmod(spotdlPath, 0o755); // Make it executable on macOS/Linux
     }
 
+    // Publisher has no stable SHA2-256SUMS file: try sidecar, else size+magic gate.
+    const sidecarOk = await tryVerifySidecarSha256(spotdlPath, url, "spotDL").catch(() => false);
+    if (!sidecarOk) {
+      await verifyBinaryIntegrity(spotdlPath, { minSizeBytes: 3_000_000, label: "spotDL" });
+    }
+
     console.log(JSON.stringify({ 
       status: "ready", 
       message: exists ? "spotDL updated successfully" : "spotDL installed successfully" 
@@ -542,6 +636,11 @@ export async function ensureGallerydlInstalled(forceUpdate = false): Promise<str
       await Deno.chmod(gallerydlPath, 0o755); // Make it executable on macOS/Linux
     }
 
+    const gallerySidecarOk = await tryVerifySidecarSha256(gallerydlPath, url, "gallery-dl").catch(() => false);
+    if (!gallerySidecarOk) {
+      await verifyBinaryIntegrity(gallerydlPath, { minSizeBytes: 2_000_000, label: "gallery-dl" });
+    }
+
     console.log(JSON.stringify({ 
       status: "ready", 
       message: exists ? "gallery-dl updated successfully" : "gallery-dl installed successfully" 
@@ -561,15 +660,90 @@ export async function ensureGallerydlInstalled(forceUpdate = false): Promise<str
   }
 }
 
+async function resolveInstaloaderOnPath(): Promise<string | null> {
+  for (const probe of [
+    ["which", "instaloader"],
+    ["sh", "-c", "command -v instaloader"],
+  ]) {
+    try {
+      const cmd = new Deno.Command(probe[0], {
+        args: probe.slice(1),
+        stdout: "piped",
+        stderr: "null",
+      });
+      const out = await cmd.output();
+      if (out.success) {
+        const p = new TextDecoder().decode(out.stdout).trim().split("\n")[0]?.trim();
+        if (p) return p;
+      }
+    } catch (_) { /* try next probe */ }
+  }
+  return null;
+}
+
+async function installInstaloaderViaPip(): Promise<void> {
+  const candidates: string[][] = [
+    ["python3", "-m", "pip", "install", "--user", "instaloader"],
+    ["python", "-m", "pip", "install", "--user", "instaloader"],
+    ["pip3", "install", "--user", "instaloader"],
+  ];
+  let lastErr = "";
+  for (const [bin, ...args] of candidates) {
+    try {
+      const cmd = new Deno.Command(bin, {
+        args,
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const out = await cmd.output();
+      if (out.success) return;
+      lastErr = new TextDecoder().decode(out.stderr).slice(-2000);
+    } catch (err) {
+      lastErr = err instanceof Error ? err.message : String(err);
+    }
+  }
+  throw new Error(`pip install instaloader failed: ${lastErr}`);
+}
+
+async function upgradeInstaloaderViaPip(): Promise<void> {
+  try {
+    const cmd = new Deno.Command("python3", {
+      args: ["-m", "pip", "install", "--user", "--upgrade", "instaloader"],
+      stdout: "null",
+      stderr: "null",
+    });
+    await cmd.output();
+  } catch (_) { /* best-effort only */ }
+}
+
 export async function ensureInstaloaderInstalled(forceUpdate = false): Promise<string> {
   const instaloaderPath = getInstaloaderPath();
   const binDir = getBinDir();
   const isWindows = Deno.build.os === "windows";
 
   if (!isWindows) {
-    // On macOS/Linux, we don't download since no standalone binary is provided.
-    // We assume the user has python/pip installed it or it's in the system PATH.
-    return "instaloader";
+    // No standalone binary on Unix: resolve via PATH, else auto-install with pip.
+    // tauri.conf already declares python3+pip as deb/rpm deps, so pip should exist.
+    const found = await resolveInstaloaderOnPath();
+    if (found && !forceUpdate) return found;
+    if (found && forceUpdate) {
+      // Best-effort upgrade, ignore failures and keep the working binary.
+      await upgradeInstaloaderViaPip().catch(() => {});
+      return (await resolveInstaloaderOnPath()) ?? found;
+    }
+    console.log(JSON.stringify({
+      status: "updating",
+      message: "Installing Instaloader via pip (first-time setup)...",
+    }));
+    await installInstaloaderViaPip();
+    const after = await resolveInstaloaderOnPath();
+    if (!after) {
+      throw new Error(
+        "Instaloader not found after pip install. Install manually: python3 -m pip install --user instaloader",
+      );
+    }
+    console.log(JSON.stringify({ status: "ready", message: "Instaloader installed successfully." }));
+    return after;
   }
 
   // Check if binary exists
@@ -678,3 +852,54 @@ export async function ensureInstaloaderInstalled(forceUpdate = false): Promise<s
 }
 
 export default ensureYtdlpInstalled;
+
+const TOOLS_UPDATE_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000; // weekly
+
+function toolsMarkerPath(): string {
+  return path.join(getBinDir(), ".last_tools_update");
+}
+
+/** Record a successful tools install/update check. Never throws. */
+export async function touchToolsMarker(): Promise<void> {
+  try {
+    await Deno.mkdir(getBinDir(), { recursive: true });
+    await Deno.writeTextFile(toolsMarkerPath(), String(Date.now()));
+  } catch (_) { /* non-fatal */ }
+}
+
+/**
+ * Honor the `engine.autoUpdateYtdlp` setting: when enabled and the last
+ * check is older than a week, force-update all download tools.
+ * Never throws — startup must not break because an update failed.
+ */
+export async function maybeAutoUpdateTools(autoUpdateEnabled: boolean): Promise<void> {
+  if (!autoUpdateEnabled) return;
+  try {
+    const raw = await Deno.readTextFile(toolsMarkerPath());
+    const last = parseInt(raw.trim(), 10);
+    if (!isNaN(last) && Date.now() - last < TOOLS_UPDATE_INTERVAL_MS) return;
+  } catch (_) {
+    // No marker yet: normal ensure-flow below installs tools, then main()
+    // touches the marker. Only force-update when a stale marker exists.
+    return;
+  }
+
+  console.log(JSON.stringify({
+    status: "updating",
+    message: "Auto-updating download tools (weekly check)...",
+  }));
+  try {
+    await ensureYtdlpInstalled(true);
+    await ensureFfmpegInstalled(true);
+    await ensureSpotdlInstalled(true);
+    await ensureGallerydlInstalled(true);
+    await ensureInstaloaderInstalled(true);
+    await touchToolsMarker();
+    console.log(JSON.stringify({ status: "ready", message: "Download tools updated." }));
+  } catch (err) {
+    console.error(JSON.stringify({
+      status: "warning",
+      message: `Auto-update failed, keeping current tools: ${err instanceof Error ? err.message : String(err)}`,
+    }));
+  }
+}

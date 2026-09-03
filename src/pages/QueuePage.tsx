@@ -98,6 +98,7 @@ export const QueuePage: React.FC = () => {
                 onPause={pauseDownload}
                 onResume={resumeDownload}
                 onCancel={cancelDownload}
+                onRetry={retryDownload}
               />
             ) : (
               <DownloadCard 

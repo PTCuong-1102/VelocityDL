@@ -1,3 +1,4 @@
+use crate::proxy::apply_proxy_from_settings;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_shell::ShellExt;
@@ -5,6 +6,7 @@ use tauri_plugin_shell::process::CommandEvent;
 
 #[tauri::command]
 pub async fn check_app_update(app: AppHandle, current_version: String) -> Result<Value, String> {
+    apply_proxy_from_settings(&app);
     let (mut rx, _child) = app
         .shell()
         .sidecar("deno-engine")
@@ -53,6 +55,7 @@ pub fn start_app_update_download(
     save_dir: String,
     file_name: String,
 ) -> Result<(), String> {
+    apply_proxy_from_settings(&app);
     let (mut rx, _child) = app
         .shell()
         .sidecar("deno-engine")
@@ -83,6 +86,63 @@ pub fn start_app_update_download(
         }
     });
 
+    Ok(())
+}
+
+/// Manual "update download tools now" — honors nothing, just forces the
+/// sidecar `update` flow and streams its updating/ready lines to the
+/// frontend as `info-progress` events (same channel as get_video_info).
+#[tauri::command]
+pub async fn update_tools(app: AppHandle) -> Result<(), String> {
+    apply_proxy_from_settings(&app);
+    let (mut rx, _child) = app
+        .shell()
+        .sidecar("deno-engine")
+        .map_err(|e| e.to_string())?
+        .args(&["update"])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    let mut last_error: Option<String> = None;
+
+    while let Some(event) = rx.recv().await {
+        match event {
+            CommandEvent::Stdout(line_bytes) => {
+                let text = String::from_utf8_lossy(&line_bytes);
+                for line in text.lines() {
+                    if let Ok(json_val) = serde_json::from_str::<Value>(line) {
+                        let status_opt = json_val.get("status").and_then(|s| s.as_str());
+                        match status_opt {
+                            Some("updating") | Some("ready") | Some("warning") | Some("info") => {
+                                let _ = app.emit("info-progress", json_val);
+                            }
+                            Some("error") => {
+                                last_error = Some(
+                                    json_val
+                                        .get("message")
+                                        .and_then(|m| m.as_str())
+                                        .unwrap_or("Tool update failed")
+                                        .to_string(),
+                                );
+                                let _ = app.emit("info-progress", json_val);
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            CommandEvent::Stderr(line_bytes) => {
+                let err_line = String::from_utf8_lossy(&line_bytes);
+                eprintln!("[Sidecar Tools Update Error]: {}", err_line);
+            }
+            CommandEvent::Terminated(_) => break,
+            _ => {}
+        }
+    }
+
+    if let Some(msg) = last_error {
+        return Err(msg);
+    }
     Ok(())
 }
 
