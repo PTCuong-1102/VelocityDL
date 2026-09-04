@@ -8,7 +8,7 @@
 #   makepkg --printsrcinfo > .SRCINFO
 
 pkgname=velocitydl
-pkgver=0.6.1
+pkgver=0.6.2
 pkgrel=1
 pkgdesc="Next-generation high-speed video downloader — powered by Deno & Tauri"
 arch=('x86_64')

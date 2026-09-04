@@ -23,31 +23,94 @@ export interface DownloadOptions {
   embedSubs?: boolean;
 }
 
-// Helper function to extract cookies using yt-dlp to a temp file
-async function extractCookiesToFile(source: string): Promise<string | null> {
+import {
+  getHomeVars,
+  discoverBrowserProfiles,
+  buildCookieSpecs,
+} from "../utils/browserProfiles.ts";
+
+/** Fallback browser order when the preferred source yields nothing. */
+const COOKIE_FALLBACK_BROWSERS = ["chrome", "edge", "firefox", "brave", "opera", "chromium", "vivaldi"];
+
+export interface CookieExportResult {
+  ok: boolean;
+  /** Temp Netscape file on success (caller owns deletion). */
+  path?: string;
+  /** Human-readable failure reason (yt-dlp stderr tail or timeout). */
+  error?: string;
+}
+
+// Extract cookies via yt-dlp into a temp Netscape file.
+// Unlike the old helper this captures stderr (so failures are explainable)
+// and times out (a wedged browser lock must not hang the whole download).
+async function tryExportCookies(spec: string): Promise<CookieExportResult> {
   const ytdlpPath = getYtdlpPath();
+  let tempFile = "";
   try {
-    const tempFile = await Deno.makeTempFile({ suffix: ".txt" });
+    tempFile = await Deno.makeTempFile({ suffix: ".txt" });
     const command = new Deno.Command(ytdlpPath, {
       args: [
-        "--cookies-from-browser", source,
+        "--cookies-from-browser", spec,
         "--cookies", tempFile,
         "--skip-download",
         "https://www.youtube.com"
       ],
       stdout: "null",
-      stderr: "null"
+      stderr: "piped",
+      signal: AbortSignal.timeout(20000),
     });
 
     const output = await command.output();
     if (output.success) {
-      return tempFile;
+      return { ok: true, path: tempFile };
     }
-    try { await Deno.remove(tempFile); } catch (_) {}
-  } catch (_) {
-    // Ignore error
+    const stderr = new TextDecoder().decode(output.stderr).trim().slice(-500);
+    try {
+      await Deno.remove(tempFile);
+    } catch (_) { /* ignore */ }
+    return { ok: false, error: stderr || `yt-dlp exited with code ${output.code}` };
+  } catch (err) {
+    if (tempFile) {
+      try {
+        await Deno.remove(tempFile);
+      } catch (_) { /* ignore */ }
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, error: msg.includes("abort") || msg.includes("Timeout") ? "timed out after 20s (browser may lock its cookie database — close it and retry)" : msg };
   }
-  return null;
+}
+
+/** Ordered browser candidates for a preferred source ("default" = detect + fallbacks). */
+export async function resolveCookieBrowsers(preferred: string): Promise<string[]> {
+  if (preferred !== "default") return [preferred];
+  const browsers: string[] = [];
+  const detected = await detectDefaultBrowser();
+  if (detected) browsers.push(detected);
+  for (const c of COOKIE_FALLBACK_BROWSERS) {
+    if (!browsers.includes(c)) browsers.push(c);
+  }
+  return browsers;
+}
+
+/** Shorten a raw yt-dlp stderr into one explainable line. */
+export function explainCookieError(stderr: string): string {
+  const t = stderr.toLowerCase();
+  if (!t) return "unknown error";
+  if (t.includes("could not find a suitable") || t.includes("not installed") || t.includes("no such file") || t.includes("not found")) {
+    return "browser not found at its standard location";
+  }
+  if (t.includes("lock") || t.includes("in use") || t.includes("database is locked")) {
+    return "cookie database is locked — close the browser and retry";
+  }
+  if (t.includes("password") || t.includes("keyring") || t.includes("kwallet") || t.includes("secret")) {
+    return "could not decrypt cookies (OS keyring locked or unavailable)";
+  }
+  if (t.includes("permission") || t.includes("denied")) {
+    return "permission denied reading the browser profile";
+  }
+  if (t.includes("timed out")) return "timed out (browser may lock its cookie database — close it and retry)";
+  const first = stderr.trim().split("\n").filter(Boolean).pop() || "unknown error";
+  return first.slice(0, 160);
 }
 
 export interface ResolvedCookies {
@@ -97,33 +160,36 @@ export async function resolveCookieFile(
   } catch (_) { /* leave empty = accept any non-empty export */ }
   const domainHint = cookieDomainHintForUrl(url);
 
-  const candidates: string[] = [];
-  if (preferred === "default") {
-    const detected = await detectDefaultBrowser();
-    if (detected) {
-      candidates.push(detected);
-      console.log(JSON.stringify({
-        status: "info",
-        message: `Using cookies from default browser: ${detected}`,
-      }));
+  const browsers = await resolveCookieBrowsers(preferred);
+  const os = Deno.build.os as "windows" | "darwin" | "linux";
+  const home = getHomeVars();
+  const profilesByBrowser: Record<string, string[]> = {};
+  for (const b of browsers) {
+    try {
+      profilesByBrowser[b] = await discoverBrowserProfiles(b, os, home);
+    } catch (_) {
+      profilesByBrowser[b] = [];
     }
-    for (const c of ["chrome", "edge", "firefox", "brave", "opera", "chromium", "vivaldi"]) {
-      if (!candidates.includes(c)) candidates.push(c);
-    }
-  } else {
-    candidates.push(preferred);
   }
+  const specs = buildCookieSpecs(browsers, profilesByBrowser, os);
+  const failures: string[] = [];
 
-  for (const src of candidates) {
-    const temp = await extractCookiesToFile(src);
-    if (!temp) continue;
-    if (await validateCookieExport(temp, host, domainHint)) {
-      return { file: temp, temp, source: src };
+  for (const spec of specs) {
+    const res = await tryExportCookies(spec);
+    if (!res.ok || !res.path) {
+      failures.push(`${spec}: ${explainCookieError(res.error ?? "")}`);
+      continue;
+    }
+    if (await validateCookieExport(res.path, host, domainHint)) {
+      const base = spec.split("+")[0].split(":")[0];
+      return { file: res.path, temp: res.path, source: base };
     }
     try {
-      await Deno.remove(temp);
+      await Deno.remove(res.path);
     } catch (_) { /* ignore */ }
   }
+
+  const detail = failures.length > 0 ? ` (${failures.slice(0, 3).join("; ")})` : "";
 
   if (preferred === "default") {
     // stdout (not stderr): the Rust side forwards these lines to the UI,
@@ -131,14 +197,16 @@ export async function resolveCookieFile(
     console.log(JSON.stringify({
       status: "updating",
       message: "Could not read cookies from any installed browser — continuing without cookies. " +
-        "Log in to the site in your browser, or set Cookie Authentication explicitly in Settings.",
+        "Log in to the site in your browser, or set Cookie Authentication explicitly in Settings." +
+        detail,
     }));
   } else {
     // Explicit choice failing used to be completely silent — surface it.
     console.log(JSON.stringify({
       status: "updating",
       message: `Could not read cookies from ${preferred} — continuing without cookies. ` +
-        "Close the browser and retry, or pick another source in Settings.",
+        "Close the browser and retry, or pick another source in Settings." +
+        detail,
     }));
   }
   return blank;
@@ -205,30 +273,40 @@ export async function checkCookieSource(
     return;
   }
 
-  const sources: string[] = [];
-  if (preferred === "default") {
-    const detected = await detectDefaultBrowser();
-    if (detected) sources.push(detected);
-    for (const c of ["chrome", "edge", "firefox", "brave", "opera", "chromium", "vivaldi", "safari", "whale"]) {
-      if (!sources.includes(c)) sources.push(c);
+  const browsers = await resolveCookieBrowsers(preferred);
+  const os = Deno.build.os as "windows" | "darwin" | "linux";
+  const home = getHomeVars();
+  const profilesByBrowser: Record<string, string[]> = {};
+  for (const b of browsers) {
+    try {
+      profilesByBrowser[b] = await discoverBrowserProfiles(b, os, home);
+    } catch (_) {
+      profilesByBrowser[b] = [];
     }
-  } else {
-    sources.push(preferred);
   }
+  const specs = buildCookieSpecs(browsers, profilesByBrowser, os);
 
   const tried: string[] = [];
-  for (const src of sources) {
-    tried.push(src);
-    const temp = await extractCookiesToFile(src);
-    if (!temp) continue;
+  const reasons: string[] = [];
+  for (const spec of specs) {
+    tried.push(spec);
+    const res = await tryExportCookies(spec);
+    if (!res.ok || !res.path) {
+      reasons.push(`${spec}: ${explainCookieError(res.error ?? "")}`);
+      continue;
+    }
+    const temp = res.path;
     try {
       const text = await Deno.readTextFile(temp);
       const cookies = parseNetscapeCookies(text);
-      if (cookies.length === 0) continue;
+      if (cookies.length === 0) {
+        reasons.push(`${spec}: export contained no cookies (wrong profile or not logged in)`);
+        continue;
+      }
       const domains = [...new Set(cookies.map((c) => c.domain.replace(/^\./, "")))].slice(0, 12);
       const report: CookieCheckReport = {
         requestedSource: preferred,
-        resolvedSource: src,
+        resolvedSource: spec.split("+")[0].split(":")[0],
         cookieCount: cookies.length,
         domains,
       };
@@ -242,7 +320,8 @@ export async function checkCookieSource(
   }
 
   fail(
-    `Could not read cookies from ${tried.join(", ")}. ` +
+    `Could not read cookies from ${[...new Set(tried.map((s) => s.split("+")[0].split(":")[0]))].join(", ")}. ` +
+    (reasons.length > 0 ? `Reasons: ${reasons.slice(0, 3).join("; ")}. ` : "") +
     "Close the browser (it may lock its cookie database) and retry, or use a cookies.txt file."
   );
 }

@@ -20,7 +20,7 @@ export const SettingsPage: React.FC = () => {
   );
 
   // App Update States
-  const [currentVersion, setCurrentVersion] = useState('0.6.1');
+  const [currentVersion, setCurrentVersion] = useState('0.6.2');
   // Tool-update states
   const [toolsStatus, setToolsStatus] = useState<'idle' | 'updating' | 'ready' | 'error'>('idle');
   const [toolsMsg, setToolsMsg] = useState('');

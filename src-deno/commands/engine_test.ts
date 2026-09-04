@@ -18,7 +18,18 @@ import {
   parseMacOSDefaultBrowser,
   cookieDomainHintForUrl,
 } from "../utils/defaultBrowser.ts";
-import { validateCookieExport } from "./download.ts";
+import {
+  validateCookieExport,
+  explainCookieError,
+  resolveCookieBrowsers,
+} from "./download.ts";
+import {
+  chromiumUserDataRoots,
+  firefoxIniPaths,
+  parseFirefoxProfilesIni,
+  keyringVariants,
+  buildCookieSpecs,
+} from "../utils/browserProfiles.ts";
 
 Deno.test("isPlaylistUrl — true YouTube playlists", () => {
   assertEquals(isPlaylistUrl("https://www.youtube.com/watch?v=abc&list=PL123"), true);
@@ -170,8 +181,7 @@ Deno.test("parseNetscapeCookies — skips comments and bad lines", () => {
   assertEquals(cookies[0], { domain: ".facebook.com", name: "c_user", value: "123" });
 });
 
-Deno.test("buildCookieHeader — domain-scoped, first wins", () => {
-  const cookies = [
+Deno.test("buildCookieHeader — domain-scoped, first wins", () => {  const cookies = [
     { domain: ".facebook.com", name: "c_user", value: "1" },
     { domain: ".facebook.com", name: "c_user", value: "dup" },
     { domain: ".youtube.com", name: "VISITOR", value: "z" },
@@ -182,4 +192,72 @@ Deno.test("buildCookieHeader — domain-scoped, first wins", () => {
   assertEquals(buildCookieHeader(cookies, "example.com"), "");
   assert(cookieDomainMatches(".facebook.com", "www.facebook.com"));
   assert(!cookieDomainMatches(".facebook.com", "notfacebook.com"));
+});
+
+Deno.test("chromiumUserDataRoots — per-OS vendor paths", () => {
+  const win = { HOME: "C:/Users/u", APPDATA: "C:/Users/u/AppData/Roaming", LOCALAPPDATA: "C:/Users/u/AppData/Local", XDG_CONFIG_HOME: "" };
+  const mac = { HOME: "/Users/u", APPDATA: "", LOCALAPPDATA: "", XDG_CONFIG_HOME: "" };
+  const lin = { HOME: "/home/u", APPDATA: "", LOCALAPPDATA: "", XDG_CONFIG_HOME: "" };
+  assertEquals(chromiumUserDataRoots("edge", "windows", win), ["C:/Users/u/AppData/Local/Microsoft/Edge/User Data"]);
+  assertEquals(chromiumUserDataRoots("chrome", "darwin", mac), ["/Users/u/Library/Application Support/Google/Chrome"]);
+  assertEquals(chromiumUserDataRoots("brave", "linux", lin), ["/home/u/.config/BraveSoftware/Brave-Browser"]);
+  // snap location included for chromium/firefox-adjacent
+  assert(chromiumUserDataRoots("chromium", "linux", lin).some((p) => p.includes("snap/chromium")));
+  assertEquals(chromiumUserDataRoots("unknown", "linux", lin), []);
+});
+
+Deno.test("firefoxIniPaths — stock + snap locations", () => {
+  const lin = { HOME: "/home/u", APPDATA: "", LOCALAPPDATA: "", XDG_CONFIG_HOME: "" };
+  const paths = firefoxIniPaths("linux", lin);
+  assert(paths.includes("/home/u/.mozilla/firefox/profiles.ini"));
+  assert(paths.includes("/home/u/snap/firefox/common/.mozilla/firefox/profiles.ini"));
+});
+
+Deno.test("parseFirefoxProfilesIni — default first, relative resolved", () => {
+  const ini = [
+    "[Profile0]",
+    "Name=old",
+    "IsRelative=1",
+    "Path=abc123.old",
+    "",
+    "[Profile1]",
+    "Name=default",
+    "IsRelative=1",
+    "Path=xyz.default",
+    "Default=1",
+  ].join("\n");
+  assertEquals(parseFirefoxProfilesIni(ini, "/base"), ["/base/xyz.default", "/base/abc123.old"]);
+  assertEquals(parseFirefoxProfilesIni("garbage", "/base"), []);
+});
+
+Deno.test("keyringVariants — only Linux Chromium family", () => {
+  assertEquals(keyringVariants("chrome", "linux"), ["", "gnomekeyring", "kwallet"]);
+  assertEquals(keyringVariants("edge", "linux"), ["", "gnomekeyring", "kwallet"]);
+  assertEquals(keyringVariants("firefox", "linux"), [""]);
+  assertEquals(keyringVariants("chrome", "windows"), [""]);
+});
+
+Deno.test("buildCookieSpecs — profiles first, capped, deduped", () => {
+  const specs = buildCookieSpecs(
+    ["chrome", "firefox"],
+    { chrome: ["/p/Default", "/p/Profile 1"], firefox: [] },
+    "linux",
+    100,
+  );
+  // explicit profiles before bare key, keyring variants per profile
+  assert(specs.indexOf("chrome:/p/Default") < specs.indexOf("chrome"));
+  assert(specs.includes("chrome+gnomekeyring:/p/Default"));
+  assert(specs.includes("firefox"));
+  assertEquals(buildCookieSpecs(["chrome"], {}, "linux", 2).length, 2);
+});
+
+Deno.test("explainCookieError — maps stderr to guidance", () => {
+  assert(explainCookieError("ERROR: could not find a suitable browser").includes("not found"));
+  assert(explainCookieError("sqlite database is locked").includes("locked"));
+  assert(explainCookieError("Failed to get password from keyring").includes("keyring"));
+  assertEquals(explainCookieError(""), "unknown error");
+});
+
+Deno.test("resolveCookieBrowsers — explicit passes through", async () => {
+  assertEquals(await resolveCookieBrowsers("edge"), ["edge"]);
 });

@@ -224,7 +224,7 @@ Tauri has no native `pacman` bundle target, so Arch is covered via AUR
 ```bash
 yay -S velocitydl
 # or portable tarball:
-tar -xzf VelocityDL-0.6.1-linux-x86_64.tar.gz && cd velocitydl && ./velocity-dl
+tar -xzf VelocityDL-0.6.2-linux-x86_64.tar.gz && cd velocitydl && ./velocity-dl
 ```
 
 Build the tarball locally with `npm run bundle:tar` (after `tauri build`).
