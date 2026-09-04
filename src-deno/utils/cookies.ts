@@ -18,9 +18,14 @@ export function parseNetscapeCookies(text: string): ParsedCookie[] {
   const out: ParsedCookie[] = [];
   for (const rawLine of text.split("\n")) {
     let line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    // Strip optional "#HttpOnly_" marker prefix (some exporters inline it).
-    if (line.startsWith("#HttpOnly_")) line = line.slice("#HttpOnly_".length);
+    if (!line) continue;
+    // Strip optional "#HttpOnly_" marker prefix FIRST — these lines carry
+    // real cookies, so this must run before the generic comment skip.
+    if (line.startsWith("#HttpOnly_")) {
+      line = line.slice("#HttpOnly_".length);
+    } else if (line.startsWith("#")) {
+      continue;
+    }
     const cols = line.split("\t");
     if (cols.length < 7) continue;
     const [domain, , , , , name, ...valueParts] = cols;
