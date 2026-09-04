@@ -1,5 +1,5 @@
 use crate::proxy::apply_proxy_from_settings;
-use crate::state::AppState;
+use crate::state::{ActiveDownload, AppState};
 use serde_json::Value;
 use tauri::{AppHandle, State, Emitter, Manager};
 use tauri_plugin_shell::ShellExt;
@@ -26,10 +26,15 @@ pub fn start_download(
         .spawn()
         .map_err(|e| e.to_string())?;
 
-    // Store the child process so we can kill it later (e.g. pause/cancel)
+    // Store the child process so we can kill it later (e.g. pause/cancel),
+    // plus the facts cancel/cleanup needs if frontend data is partial.
     {
         let mut active = state.active_downloads.lock().map_err(|e| format!("Lock poisoned: {}", e))?;
-        active.insert(id.clone(), child);
+        active.insert(id.clone(), ActiveDownload {
+            child,
+            save_dir: save_dir.clone(),
+            output_paths: std::collections::HashSet::new(),
+        });
     }
 
     // Spawn async task to monitor output
@@ -43,7 +48,19 @@ pub fn start_download(
                     let line = String::from_utf8_lossy(&line_bytes);
                     for single_line in line.lines() {
                         if let Ok(payload) = serde_json::from_str::<Value>(single_line) {
-                            // Emit progress to frontend
+                            // Remember reported output paths for cancel cleanup,
+                            // then emit progress to frontend.
+                            if let Some(out) = payload.get("outputPath").and_then(|v| v.as_str()) {
+                                if !out.is_empty() {
+                                    if let Some(state_accessor) = app_clone.try_state::<AppState>() {
+                                        if let Ok(mut active) = state_accessor.active_downloads.lock() {
+                                            if let Some(entry) = active.get_mut(&id_clone) {
+                                                entry.output_paths.insert(out.to_string());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                             let _ = app_clone.emit("download-progress", payload);
                         }
                     }
@@ -87,8 +104,8 @@ pub fn start_download(
 #[tauri::command]
 pub fn pause_download(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut active = state.active_downloads.lock().map_err(|e| format!("Lock poisoned: {}", e))?;
-    if let Some(child) = active.remove(&id) {
-        child.kill().map_err(|e| e.to_string())?;
+    if let Some(entry) = active.remove(&id) {
+        entry.child.kill().map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -101,8 +118,17 @@ pub fn cancel_download(
     save_dir: String,
 ) -> Result<(), String> {
     let mut active = state.active_downloads.lock().map_err(|e| format!("Lock poisoned: {}", e))?;
-    if let Some(child) = active.remove(&id) {
-        let _ = child.kill();
+    // Merge backend-tracked facts with frontend-provided ones: either side
+    // may hold paths the other never saw (restart, missed events).
+    let mut known_paths: std::collections::HashSet<String> =
+        file_paths.into_iter().filter(|p| !p.is_empty()).collect();
+    let mut tracked_save_dir = save_dir.clone();
+    if let Some(entry) = active.remove(&id) {
+        let _ = entry.child.kill();
+        known_paths.extend(entry.output_paths.into_iter());
+        if tracked_save_dir.is_empty() {
+            tracked_save_dir = entry.save_dir;
+        }
     }
     // No other downloads running → safe to sweep orphaned partial files
     // (children whose outputPath was never reported) in this item's dir.
@@ -111,24 +137,22 @@ pub fn cancel_download(
     let no_active_left = active.is_empty();
     drop(active);
 
-    for path in file_paths {
-        if !path.is_empty() {
-            let path_buf = std::path::PathBuf::from(&path);
-            if path_buf.exists() {
-                let _ = std::fs::remove_file(&path_buf);
-            }
-            // Delete standard .part (e.g. file.mp4.part)
-            let raw_part = format!("{}.part", path);
-            let _ = std::fs::remove_file(&raw_part);
-            
-            // Delete standard .ytdl (e.g. file.mp4.ytdl)
-            let raw_ytdl = format!("{}.ytdl", path);
-            let _ = std::fs::remove_file(&raw_ytdl);
+    for path in known_paths {
+        let path_buf = std::path::PathBuf::from(&path);
+        if path_buf.exists() {
+            let _ = std::fs::remove_file(&path_buf);
         }
+        // Delete standard .part (e.g. file.mp4.part)
+        let raw_part = format!("{}.part", path);
+        let _ = std::fs::remove_file(&raw_part);
+
+        // Delete standard .ytdl (e.g. file.mp4.ytdl)
+        let raw_ytdl = format!("{}.ytdl", path);
+        let _ = std::fs::remove_file(&raw_ytdl);
     }
 
-    if no_active_left && !save_dir.is_empty() {
-        if let Ok(entries) = std::fs::read_dir(&save_dir) {
+    if no_active_left && !tracked_save_dir.is_empty() {
+        if let Ok(entries) = std::fs::read_dir(&tracked_save_dir) {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if !p.is_file() {

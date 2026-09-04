@@ -20,7 +20,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     proxyType: 'HTTP',
     proxyAddress: '',
     autoUpdateYtdlp: true,
-    cookieSource: 'none',
+    cookieSource: 'default',
     cookieFilePath: '',
     speedLimit: 0,
   },

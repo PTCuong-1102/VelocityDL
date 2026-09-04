@@ -2,11 +2,14 @@ import React from 'react';
 import FinishedCard from '../components/ui/FinishedCard';
 import { useDownloadStore } from '../stores/downloadStore';
 import { useUIStore } from '../stores/uiStore';
+import { useToastStore } from '../stores/toastStore';
+import { AnyDownloadItem, isPlaylistItem } from '../types/download';
 import { invoke } from '@tauri-apps/api/core';
 
 export const FinishedPage: React.FC = () => {
   const { downloads, clearFinished } = useDownloadStore();
   const { searchQuery } = useUIStore();
+  const { addToast } = useToastStore();
 
   // Get finished items
   const finishedItems = downloads.filter((d) => d.status === 'finished');
@@ -20,18 +23,38 @@ export const FinishedPage: React.FC = () => {
   });
 
   const handlePlay = async (path: string) => {
+    if (!path) {
+      addToast('error', 'No playable file was recorded for this download.');
+      return;
+    }
     try {
       await invoke('open_file', { path });
     } catch (err) {
       console.error('Failed to play file:', err);
+      addToast('error', `Could not open file: ${String(err)}`);
     }
   };
 
-  const handleOpenFolder = async (path: string) => {
+  /** Reveal the best known path: a child file for playlists, else the item path. */
+  const revealPathFor = (item: AnyDownloadItem): string => {
+    if (isPlaylistItem(item)) {
+      const child = (item.children || []).find((c) => !!c.outputPath);
+      if (child) return child.outputPath;
+    }
+    return item.outputPath;
+  };
+
+  const handleOpenFolder = async (item: AnyDownloadItem) => {
+    const path = revealPathFor(item);
+    if (!path) {
+      addToast('error', 'No file location was recorded for this download.');
+      return;
+    }
     try {
       await invoke('open_folder', { path });
     } catch (err) {
       console.error('Failed to open enclosing folder:', err);
+      addToast('error', `Could not open folder: ${String(err)}`);
     }
   };
 

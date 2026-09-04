@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { AnyDownloadItem, DownloadStatus, isPlaylistItem } from '../types/download';
+import { trimFinished } from '../utils/downloadOptions';
 import { DownloadProgressPayload } from '../types/ipc';
 
 interface DownloadState {
@@ -25,12 +26,17 @@ export const useDownloadStore = create<DownloadState>()(
         if (state.downloads.some((d) => d.id === item.id)) {
           return state;
         }
-        return { downloads: [item, ...state.downloads] };
+        return { downloads: trimFinished([item, ...state.downloads]) };
       }),
       
       updateProgress: (payload) => set((state) => ({
-        downloads: state.downloads.map((item) => {
+        downloads: trimFinished(state.downloads.map((item) => {
           if (item.id !== payload.id) return item;
+
+          // User-driven terminal-ish states win over stale backend events:
+          // a progress/finish line buffered before pause/cancel/kill must not
+          // resurrect the item. Only an explicit retry (→queued) re-arms it.
+          if (item.status === 'paused' || item.status === 'error') return item;
 
           if (isPlaylistItem(item)) {
             let completedItems = item.completedItems;
@@ -100,7 +106,7 @@ export const useDownloadStore = create<DownloadState>()(
               outputPath: payload.outputPath || item.outputPath,
             };
           }
-        }),
+        })),
       })),
       
       pauseDownload: (id) => set((state) => ({

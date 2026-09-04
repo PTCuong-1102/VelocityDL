@@ -8,7 +8,7 @@ import { isPlaylistItem } from '../types/download';
 
 export const QueuePage: React.FC = () => {
   const { downloads } = useDownloadStore();
-  const { pauseDownload, resumeDownload, cancelDownload, retryDownload } = useDownload();
+  const { pauseDownload, resumeDownload, cancelDownload, retryDownload, removeDownloadItem } = useDownload();
   const { searchQuery } = useUIStore();
 
   // Filter out completed/finished downloads
@@ -99,6 +99,7 @@ export const QueuePage: React.FC = () => {
                 onResume={resumeDownload}
                 onCancel={cancelDownload}
                 onRetry={retryDownload}
+                onRemove={removeDownloadItem}
               />
             ) : (
               <DownloadCard 
@@ -108,6 +109,7 @@ export const QueuePage: React.FC = () => {
                 onResume={resumeDownload}
                 onCancel={cancelDownload}
                 onRetry={retryDownload}
+                onRemove={removeDownloadItem}
               />
             )
           ))

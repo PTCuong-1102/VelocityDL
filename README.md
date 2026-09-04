@@ -33,7 +33,9 @@
 | ⚙️ **Persistent Settings** | Proxy config, download path, concurrent threads — saved to disk |
 | 🔒 **Secure yt-dlp Management** | Auto-downloads yt-dlp with SHA-256 checksum verification |
 | 🔔 **Toast Notifications** | Instant feedback on download start, completion, and errors |
-| 🌐 **Embedded Browser** | Browse sites directly inside the app |
+| 🖥️ **Desktop Notifications** | Optional OS alerts when downloads finish or fail |
+| 🚀 **Launch on Boot** | Optional auto-start at login |
+| 📦 **Arch Linux Support** | AUR package + portable `.tar.gz` (see `packaging/arch/`) |
 | 🛡️ **Safe Process Cleanup** | All download subprocesses are killed gracefully on app exit |
 
 ---
@@ -112,9 +114,12 @@ VelocityDL/
 │   │   └── ui/                 # DownloadCard, PlaylistCard, Toast, ...
 │   ├── hooks/
 │   │   ├── useDownload.ts      # Core download logic + toast integration
+│   │   ├── useQueueManager.ts  # Concurrency-limited queue dispatcher
+│   │   ├── useClipboardWatcher.ts # Auto-detect URLs in clipboard
+│   │   ├── useKeyboardShortcuts.ts # Ctrl+1..4 / Esc navigation
 │   │   └── useTauriEvent.ts    # Typed Tauri event listener
 │   ├── pages/                  # DashboardPage, QueuePage, FinishedPage,
-│   │   │                       # ScheduledPage, BrowserPage, SettingsPage
+│   │                           # SettingsPage
 │   ├── stores/                 # Zustand stores
 │   │   ├── downloadStore.ts    # Download queue state
 │   │   ├── settingsStore.ts    # App settings state
@@ -126,9 +131,10 @@ VelocityDL/
 │   ├── src/
 │   │   ├── commands/
 │   │   │   ├── download.rs     # start/pause/cancel/get_video_info
-│   │   │   ├── settings.rs     # load/save settings, browse directory
+│   │   │   ├── settings.rs     # load/save settings, launch-on-boot, browse
 │   │   │   ├── filesystem.rs   # open file/folder in OS
-│   │   │   └── update.rs       # app auto-update checking & downloading
+│   │   │   └── update.rs       # app updates + download-tools updater
+│   │   ├── proxy.rs            # proxy propagation to sidecar processes
 │   │   ├── state.rs            # AppState (active downloads map)
 │   │   └── lib.rs              # Tauri builder + window close cleanup
 │   ├── binaries/               # Compiled Deno sidecar binary
@@ -137,12 +143,14 @@ VelocityDL/
 │
 ├── src-deno/                   # Deno sidecar engine
 │   ├── commands/
-│   │   ├── download.ts         # yt-dlp download with real-time streaming
-│   │   ├── info.ts             # yt-dlp metadata extraction
-│   │   ├── update.ts           # yt-dlp auto-install + SHA-256 verification
+│   │   ├── download.ts         # multi-tool router (yt-dlp/spotDL/gallery-dl/…
+│   │   │                       # …FB-story scraper) with real-time streaming
+│   │   ├── info.ts             # metadata extraction + playlist detection
+│   │   ├── update.ts           # tool auto-install, integrity checks, auto-update
 │   │   └── appUpdate.ts        # checks and downloads app updates
 │   ├── utils/
-│   │   └── paths.ts            # Cross-platform binary paths
+│   │   ├── paths.ts            # Cross-platform binary paths
+│   │   └── cookies.ts          # Netscape cookies.txt parsing
 │   └── main.ts                 # CLI command router (info | download | update | appUpdate)
 │
 ├── .vscode/
@@ -164,8 +172,16 @@ VelocityDL/
 | [Deno](https://deno.com/) | ≥ 2.0 | `irm https://deno.land/install.ps1 \| iex` (Windows) |
 | [Tauri CLI prerequisites](https://tauri.app/start/prerequisites/) | — | See Tauri docs for your OS |
 
-> **Linux Note:** To build `.deb`, `.rpm`, and `.AppImage`, ensure you have the required build dependencies:
-> `sudo apt update && sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev rpm`
+> **Linux Note:** To compile Tauri and build packages, ensure you have the required build dependencies:
+> 
+> - **Fedora / Rocky Linux / RHEL:**
+>   ```bash
+>   sudo dnf install -y webkit2gtk4.1-devel javascriptcoregtk4.1-devel libsoup3-devel libayatana-appindicator-gtk3-devel librsvg2-devel
+>   ```
+> - **Ubuntu / Debian:**
+>   ```bash
+>   sudo apt update && sudo apt install -y libwebkit2gtk-4.1-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev rpm
+>   ```
 
 ### Installation
 
@@ -208,7 +224,7 @@ Tauri has no native `pacman` bundle target, so Arch is covered via AUR
 ```bash
 yay -S velocitydl
 # or portable tarball:
-tar -xzf VelocityDL-0.6.0-linux-x86_64.tar.gz && cd velocitydl && ./velocity-dl
+tar -xzf VelocityDL-0.6.1-linux-x86_64.tar.gz && cd velocitydl && ./velocity-dl
 ```
 
 Build the tarball locally with `npm run bundle:tar` (after `tauri build`).

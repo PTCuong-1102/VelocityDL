@@ -48,7 +48,7 @@ pub fn load_settings(app: tauri::AppHandle) -> Result<Value, String> {
                 "proxyType": "HTTP",
                 "proxyAddress": "",
                 "autoUpdateYtdlp": true,
-                "cookieSource": "none",
+                "cookieSource": "default",
                 "cookieFilePath": "",
                 "speedLimit": 0
             },

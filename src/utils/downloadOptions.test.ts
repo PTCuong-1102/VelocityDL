@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseMaxHeight, buildSidecarOptions } from './downloadOptions';
+import { parseMaxHeight, buildSidecarOptions, trimFinished } from './downloadOptions';
 import type { AnyDownloadItem } from '../types/download';
 
 const base: AnyDownloadItem = {
@@ -76,5 +76,34 @@ describe('buildSidecarOptions', () => {
       audioFormat: 'mp3',
       audioQuality: '320k',
     });
+  });
+});
+
+describe('trimFinished', () => {
+  const finished = (id: string, completedAt: number): AnyDownloadItem => ({
+    ...base,
+    id,
+    status: 'finished',
+    completedAt,
+    createdAt: completedAt,
+  });
+
+  it('keeps active items and drops oldest finished beyond cap', () => {
+    const active: AnyDownloadItem = { ...base, id: 'active', status: 'downloading' };
+    const items = [
+      active,
+      ...Array.from({ length: 205 }, (_, i) => finished(`f${i}`, 1000 + i)),
+    ];
+    const out = trimFinished(items);
+    expect(out.some((d) => d.id === 'active')).toBe(true);
+    expect(out.filter((d) => d.status === 'finished').length).toBe(200);
+    // Oldest dropped, newest kept
+    expect(out.some((d) => d.id === 'f0')).toBe(false);
+    expect(out.some((d) => d.id === 'f204')).toBe(true);
+  });
+
+  it('returns input untouched under the cap', () => {
+    const items = [base, finished('f1', 1)];
+    expect(trimFinished(items)).toBe(items);
   });
 });

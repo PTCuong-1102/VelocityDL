@@ -78,6 +78,7 @@ async function main() {
         await ensureSpotdlInstalled(true);
         await ensureGallerydlInstalled(true);
         await ensureInstaloaderInstalled(true);
+        await touchToolsMarker();
         break;
       }
 

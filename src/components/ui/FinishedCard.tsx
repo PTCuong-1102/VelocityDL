@@ -1,5 +1,5 @@
 import React from 'react';
-import { AnyDownloadItem } from '../../types/download';
+import { AnyDownloadItem, isPlaylistItem } from '../../types/download';
 import { formatBytes } from '../../utils/format';
 import { getPlatformColor } from '../../utils/platform';
 import PlatformIcon from '../shared/PlatformIcon';
@@ -7,7 +7,7 @@ import PlatformIcon from '../shared/PlatformIcon';
 interface FinishedCardProps {
   item: AnyDownloadItem;
   onPlay?: (path: string) => void;
-  onOpenFolder?: (path: string) => void;
+  onOpenFolder?: (item: AnyDownloadItem) => void;
 }
 
 export const FinishedCard: React.FC<FinishedCardProps> = ({
@@ -16,6 +16,12 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
   onOpenFolder
 }) => {
   const platformColor = getPlatformColor(item.platform);
+  // Play needs a real file; a playlist parent outputPath is a directory.
+  const canPlay = !!item.outputPath && !isPlaylistItem(item);
+  // Reveal needs at least one known path (parent dir or any child file).
+  const canReveal =
+    !!item.outputPath ||
+    (isPlaylistItem(item) && (item.children || []).some((c) => !!c.outputPath));
 
   return (
     <div
@@ -171,7 +177,7 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
             paddingTop: '8px'
           }}
         >
-          {onPlay && (
+          {onPlay && canPlay && (
             <button
               className="btn btn-ghost"
               style={{
@@ -189,14 +195,14 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
             </button>
           )}
 
-          {onOpenFolder && (
+          {onOpenFolder && canReveal && (
             <button
               className="btn btn-ghost btn-icon flex-center"
               style={{
                 width: '28px',
                 height: '28px'
               }}
-              onClick={() => onOpenFolder(item.outputPath)}
+              onClick={() => onOpenFolder(item)}
               title="Open enclosing folder"
             >
               <span className="icon" style={{ fontSize: '16px' }}>folder_open</span>

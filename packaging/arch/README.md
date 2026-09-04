@@ -27,8 +27,8 @@ Maintainer notes (`packaging/arch/`):
 Download `VelocityDL-<ver>-linux-x86_64.tar.gz` (+ `.sha256`) from GitHub Releases:
 
 ```bash
-sha256sum -c VelocityDL-0.6.0-linux-x86_64.tar.gz.sha256
-tar -xzf VelocityDL-0.6.0-linux-x86_64.tar.gz
+sha256sum -c VelocityDL-0.6.1-linux-x86_64.tar.gz.sha256
+tar -xzf VelocityDL-0.6.1-linux-x86_64.tar.gz
 cd velocitydl
 ./velocity-dl
 ```

@@ -105,6 +105,18 @@ export function useDownload() {
   });
 
   const startDownload = async (url: string, options: DownloadOptions, prefetchedInfo?: any) => {
+    // Guard against duplicate active entries for the same URL.
+    const dupe = useDownloadStore.getState().downloads.some(
+      (d) =>
+        d.url === url.trim() &&
+        (d.status === 'analyzing' || d.status === 'queued' ||
+         d.status === 'downloading' || d.status === 'merging' || d.status === 'paused')
+    );
+    if (dupe) {
+      addToast('info', 'This URL is already in your queue.');
+      return;
+    }
+
     const id = generateDownloadId();
     // Persist the user's chosen options on the item so the queue manager
     // can forward them verbatim to the backend (subtitles were dropped here).
@@ -268,6 +280,12 @@ export function useDownload() {
 
   const cancelDownload = async (id: string) => {
     const item = useDownloadStore.getState().downloads.find((d) => d.id === id);
+    // Analyzing items have no backend download process (the metadata probe
+    // is untracked) — just drop them instead of parking in error state.
+    if (item && item.status === 'analyzing') {
+      useDownloadStore.getState().removeDownload(id);
+      return;
+    }
     const filePaths: string[] = [];
 
     if (item) {
@@ -303,11 +321,23 @@ export function useDownload() {
     addToast('info', 'Retrying download...');
   };
 
+  const removeDownloadItem = async (id: string) => {
+    const item = useDownloadStore.getState().downloads.find((d) => d.id === id);
+    if (!item) return;
+    // Kill the backend process first when still active/queued, otherwise it
+    // would leak in active_downloads and keep writing files.
+    if (item.status === 'downloading' || item.status === 'merging' || item.status === 'queued') {
+      await cancelDownload(id);
+    }
+    useDownloadStore.getState().removeDownload(id);
+  };
+
   return {
     startDownload,
     pauseDownload,
     resumeDownload,
     cancelDownload,
+    removeDownloadItem,
     retryDownload
   };
 }

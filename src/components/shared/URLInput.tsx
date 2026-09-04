@@ -676,7 +676,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
             boxShadow: 'var(--shadow-lg), var(--glow-primary)'
           }}
         >
-          {/* Cookie-gated content warning (e.g. Facebook Stories) */}
+          {/* Cookie-gated content warning (e.g. Facebook/Instagram Stories) */}
           {analyzedInfo.requiresCookies && (
             <div
               className="flex-row gap-sm"
@@ -692,11 +692,12 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
             >
               <span className="icon" style={{ fontSize: '18px', color: 'var(--tertiary, #ffb95f)' }}>lock</span>
               <span>
-                This link needs Facebook login cookies. Set <strong>Cookie Authentication</strong> in
+                This link needs {getPlatformName(analyzedInfo.platform)} login cookies. Set <strong>Cookie Authentication</strong> in
                 Settings first, otherwise the download will fail.
               </span>
             </div>
-          )}          {/* Media Info Section */}
+          )}
+          {/* Media Info Section */}
           <div 
             className="flex-row gap-lg" 
             style={{ 

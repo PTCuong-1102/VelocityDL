@@ -23,7 +23,7 @@ const PLATFORM_URLS: Record<Platform, string> = {
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { downloads } = useDownloadStore();
-  const { startDownload, pauseDownload, resumeDownload, cancelDownload, retryDownload } = useDownload();
+  const { startDownload, pauseDownload, resumeDownload, cancelDownload, retryDownload, removeDownloadItem } = useDownload();
   const { addToast } = useToastStore();
 
   // Show only active/downloading/queued/paused items, max 3
@@ -181,6 +181,7 @@ export const DashboardPage: React.FC = () => {
                   onResume={resumeDownload}
                   onCancel={cancelDownload}
                   onRetry={retryDownload}
+                  onRemove={removeDownloadItem}
                 />
               ) : (
                 <DownloadCard 
@@ -190,6 +191,7 @@ export const DashboardPage: React.FC = () => {
                   onResume={resumeDownload}
                   onCancel={cancelDownload}
                   onRetry={retryDownload}
+                  onRemove={removeDownloadItem}
                 />
               )
             ))}

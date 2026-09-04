@@ -3,7 +3,7 @@
 #
 # Usage:
 #   bash scripts/make-linux-tar.sh [version] [arch]
-#   bash scripts/make-linux-tar.sh 0.6.0 x86_64
+#   bash scripts/make-linux-tar.sh 0.6.1 x86_64
 #
 # Inputs (produced by `npm run tauri build` on Linux):
 #   src-tauri/target/release/velocity-dl                        # app binary
@@ -22,7 +22,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${1:-$(node -p "require('$ROOT/package.json').version" 2>/dev/null || echo 0.6.0)}"
+VERSION="${1:-$(node -p "require('$ROOT/package.json').version" 2>/dev/null || echo 0.6.1)}"
 ARCH="${2:-x86_64}"
 TRIPLE="x86_64-unknown-linux-gnu"
 if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then

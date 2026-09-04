@@ -204,7 +204,8 @@ export async function getVideoInfo(url: string): Promise<void> {
         format: "mp4",
         quality: "HD",
         availableQualities: ["HD"],
-        platform: "instagram"
+        platform: "instagram",
+        requiresCookies: true
       }
     };
     console.log(JSON.stringify(payload));

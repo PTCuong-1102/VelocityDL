@@ -5,6 +5,7 @@ import NumberStepper from '../components/ui/NumberStepper';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useDownloadStore } from '../stores/downloadStore';
 import { useToastStore } from '../stores/toastStore';
 import { invoke } from '@tauri-apps/api/core';
 import { useTauriEvent } from '../hooks/useTauriEvent';
@@ -13,9 +14,13 @@ import { getVersion } from '@tauri-apps/api/app';
 export const SettingsPage: React.FC = () => {
   const { settings, updateSetting, resetDefaults, isSaving } = useSettingsStore();
   const { addToast } = useToastStore();
+  // Tool updates are refused by the backend while downloads run.
+  const hasActiveDownloads = useDownloadStore((s) =>
+    s.downloads.some((d) => d.status === 'downloading' || d.status === 'merging')
+  );
 
   // App Update States
-  const [currentVersion, setCurrentVersion] = useState('0.6.0');
+  const [currentVersion, setCurrentVersion] = useState('0.6.1');
   // Tool-update states
   const [toolsStatus, setToolsStatus] = useState<'idle' | 'updating' | 'ready' | 'error'>('idle');
   const [toolsMsg, setToolsMsg] = useState('');
@@ -122,6 +127,10 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleUpdateTools = async () => {
+    if (hasActiveDownloads) {
+      addToast('info', 'Pause or wait for running downloads before updating tools.');
+      return;
+    }
     setToolsStatus('updating');
     setToolsMsg('Starting tool update...');
     try {
@@ -313,7 +322,7 @@ export const SettingsPage: React.FC = () => {
 
               {/* Cookie Settings */}
               <div className="flex-col gap-sm">
-                <span style={{ fontWeight: 500, fontSize: '13px' }}>Cookie Authentication (Instagram/TikTok Stories)</span>
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>Cookie Authentication (Stories &amp; Login-gated Content)</span>
                 <div className="flex-row gap-sm">
                   <select
                     style={{
@@ -331,12 +340,17 @@ export const SettingsPage: React.FC = () => {
                     value={settings.engine.cookieSource}
                     onChange={(e) => updateSetting('engine', 'cookieSource', e.target.value as any)}
                   >
+                    <option value="default">System Default Browser (Recommended)</option>
                     <option value="none">No Cookies (None)</option>
                     <option value="chrome">Google Chrome</option>
                     <option value="firefox">Mozilla Firefox</option>
                     <option value="edge">Microsoft Edge</option>
                     <option value="safari">Apple Safari</option>
                     <option value="opera">Opera</option>
+                    <option value="brave">Brave</option>
+                    <option value="chromium">Chromium</option>
+                    <option value="vivaldi">Vivaldi</option>
+                    <option value="whale">Naver Whale</option>
                     <option value="file">Use cookies.txt file</option>
                   </select>
                 </div>
@@ -354,7 +368,8 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 )}
                 <span className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
-                  Stories require authentication. If choosing a browser, ensure you are logged in to Instagram/TikTok in that browser. 
+                  Facebook/Instagram/TikTok stories require authentication. System Default auto-detects
+                  your OS browser and falls back to other installed browsers when needed.
                   Alternatively, export and upload a <code>cookies.txt</code> file.
                 </span>
               </div>
@@ -388,6 +403,7 @@ export const SettingsPage: React.FC = () => {
                     variant="ghost"
                     onClick={handleUpdateTools}
                     style={{ height: '38px', whiteSpace: 'nowrap' }}
+                    title={hasActiveDownloads ? 'Unavailable while downloads are running' : undefined}
                   >
                     {toolsStatus === 'updating' ? 'Updating…' : 'Update Tools Now'}
                   </Button>

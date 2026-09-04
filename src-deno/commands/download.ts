@@ -7,7 +7,11 @@ import {
   getInstaloaderPath,
   getSettings
 } from "../utils/paths.ts";
-import { readCookieHeader } from "../utils/cookies.ts";
+import { readCookieHeader, parseNetscapeCookies, cookieDomainMatches } from "../utils/cookies.ts";
+import {
+  detectDefaultBrowser,
+  cookieDomainHintForUrl,
+} from "../utils/defaultBrowser.ts";
 
 export interface DownloadOptions {
   maxHeight: number;
@@ -46,6 +50,93 @@ async function extractCookiesToFile(source: string): Promise<string | null> {
   return null;
 }
 
+export interface ResolvedCookies {
+  /** Cookie file to use (temp export or explicit user file). */
+  file: string | null;
+  /** Set when `file` is a temp export the caller must delete. */
+  temp: string | null;
+  /** Browser key the export came from (for --cookies-from-browser reuse). */
+  source: string | null;
+}
+
+/** Check an exported cookies.txt actually holds cookies for the target host. */
+export async function validateCookieExport(
+  filePath: string,
+  host: string,
+  domainHint: string,
+): Promise<boolean> {
+  try {
+    const text = await Deno.readTextFile(filePath);
+    const cookies = parseNetscapeCookies(text);
+    if (cookies.length === 0) return false;
+    const targets = [host, domainHint].filter(Boolean);
+    if (targets.length === 0) return true;
+    return cookies.some((c) => targets.some((t) => cookieDomainMatches(c.domain, t)));
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
+ * Resolve the configured cookie source into a usable cookie file.
+ * - "none" → no cookies.
+ * - "default" → detect OS default browser, then walk fallback browsers;
+ *   first export that validates against the target wins.
+ * - explicit browser → try it once (legacy behavior: silent skip on failure).
+ */
+export async function resolveCookieFile(
+  preferred: string,
+  url: string,
+): Promise<ResolvedCookies> {
+  const blank: ResolvedCookies = { file: null, temp: null, source: null };
+  if (preferred === "none") return blank;
+
+  let host = "";
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch (_) { /* leave empty = accept any non-empty export */ }
+  const domainHint = cookieDomainHintForUrl(url);
+
+  const candidates: string[] = [];
+  if (preferred === "default") {
+    const detected = await detectDefaultBrowser();
+    if (detected) {
+      candidates.push(detected);
+      console.log(JSON.stringify({
+        status: "info",
+        message: `Using cookies from default browser: ${detected}`,
+      }));
+    }
+    for (const c of ["chrome", "edge", "firefox", "brave", "opera", "chromium", "vivaldi"]) {
+      if (!candidates.includes(c)) candidates.push(c);
+    }
+  } else {
+    candidates.push(preferred);
+  }
+
+  for (const src of candidates) {
+    const temp = await extractCookiesToFile(src);
+    if (!temp) continue;
+    if (await validateCookieExport(temp, host, domainHint)) {
+      return { file: temp, temp, source: src };
+    }
+    try {
+      await Deno.remove(temp);
+    } catch (_) { /* ignore */ }
+  }
+
+  if (preferred === "default") {
+    // stdout (not stderr): the Rust side forwards these lines to the UI,
+    // so the user actually sees why a login-gated download may fail.
+    console.log(JSON.stringify({
+      status: "updating",
+      message: "Could not read cookies from any installed browser — continuing without cookies. " +
+        "Log in to the site in your browser, or set Cookie Authentication explicitly in Settings.",
+    }));
+  }
+  return blank;
+}
+
 export async function downloadMedia(
   id: string,
   url: string,
@@ -62,15 +153,19 @@ export async function downloadMedia(
 
   let tempCookieFile: string | null = null;
   let finalCookieFile: string | null = null;
+  let resolvedCookieSource = cookieSource;
 
   try {
     if (cookieSource === "file" && cookieFilePath) {
       finalCookieFile = cookieFilePath;
-    } else if (cookieSource !== "none") {
-      tempCookieFile = await extractCookiesToFile(cookieSource);
-      if (tempCookieFile) {
-        finalCookieFile = tempCookieFile;
-      }
+    } else {
+      const resolved = await resolveCookieFile(cookieSource, url);
+      finalCookieFile = resolved.file;
+      tempCookieFile = resolved.temp;
+      // Never forward the pseudo-source "default" to yt-dlp — it would fail.
+      // Keep an explicit browser choice so yt-dlp can try reading it
+      // directly as a last resort (legacy fallback).
+      resolvedCookieSource = resolved.source ?? (cookieSource === "default" ? "none" : cookieSource);
     }
 
     // 1. Route Facebook Stories (/stories/ path) to the dedicated scraper.
@@ -117,7 +212,7 @@ export async function downloadMedia(
     }
 
     // 7. Default Route: yt-dlp
-    await downloadYtdlp(id, url, saveDir, options, cookieSource, finalCookieFile, speedLimit);
+    await downloadYtdlp(id, url, saveDir, options, resolvedCookieSource, finalCookieFile, speedLimit);
 
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
@@ -737,6 +832,21 @@ async function downloadInstagramStory(
 
   if (!username) {
     throw new Error("Could not extract Instagram username from URL");
+  }
+
+  // Instagram Stories are login-gated: fail fast with guidance instead of
+  // running instaloader blind and surfacing its cryptic stderr at the end.
+  if (!cookieFilePath) {
+    throw new Error(
+      "Instagram Stories require login cookies. Go to Settings → Cookie " +
+      "Authentication, pick your browser (or a cookies.txt file), then retry.",
+    );
+  }
+  if (!await validateCookieExport(cookieFilePath, "instagram.com", "instagram.com")) {
+    throw new Error(
+      "No Instagram cookies found. Make sure you are logged into Instagram " +
+      "in the selected browser (close it and retry), or re-export cookies.txt.",
+    );
   }
 
   const args: string[] = [

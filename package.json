@@ -1,7 +1,7 @@
 {
   "name": "velocity-dl",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.6.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,7 +14,7 @@
     "build:deno:linux": "deno compile --allow-all --target x86_64-unknown-linux-gnu --output src-tauri/binaries/deno-engine-x86_64-unknown-linux-gnu src-deno/main.ts",
     "build:deno": "npm run build:deno:win && npm run build:deno:linux",
     "check:deno": "deno check src-deno/main.ts",
-    "test:deno": "deno test --allow-read --allow-env src-deno/",
+    "test:deno": "deno test --allow-read --allow-write --allow-env src-deno/",
     "build:all": "npm run build:deno && npm run build",
     "bundle:tar": "bash scripts/make-linux-tar.sh"
   },

@@ -10,13 +10,14 @@ import { isPlaylistItem } from '../types/download';
  * Queue Manager: watches for 'queued' items and starts downloads
  * up to the concurrent limit.
  *
- * Fixed: Uses zustand subscribe + ref-based tracking to avoid
- * the infinite re-render loop caused by depending on `downloads`
- * in a useEffect that mutates `downloads`.
+ * State-driven (no processed-id bookkeeping): an item is eligible iff its
+ * status is 'queued'. Pause/cancel move it out of 'queued', retry/resume
+ * move it back in — so re-queueing always restarts the job. The
+ * `isProcessing` gate plus the synchronous optimistic status flip make
+ * double-spawns impossible in one JS turn.
  */
 export const useQueueManager = () => {
   const isProcessing = useRef(false);
-  const processedIds = useRef(new Set<string>());
 
   useEffect(() => {
     const processQueue = async () => {
@@ -36,16 +37,11 @@ export const useQueueManager = () => {
         if (activeCount >= concurrentThreads) return;
 
         const availableSlots = concurrentThreads - activeCount;
-        const queuedItems = downloads.filter(
-          (d) => d.status === 'queued' && !processedIds.current.has(d.id)
-        );
+        const queuedItems = downloads.filter((d) => d.status === 'queued');
 
         const itemsToStart = queuedItems.slice(0, availableSlots);
 
         for (const item of itemsToStart) {
-          // Mark as processed to prevent duplicate triggers
-          processedIds.current.add(item.id);
-
           // Reconstruct saveDir (persist it for later cancel cleanup)
           let saveDir = settings.storage.defaultDownloadPath || '.';
           if (isPlaylistItem(item) && settings.storage.createSubfolders && item.title) {
@@ -62,7 +58,8 @@ export const useQueueManager = () => {
           const options = buildSidecarOptions(item);
 
           // Optimistically mark as downloading, preserving current progress
-          // so resume doesn't visually restart from 0%.
+          // so resume doesn't visually restart from 0%. This synchronous
+          // flip is what prevents a second trigger from re-starting it.
           updateProgress({
             id: item.id,
             progress: item.progress,
@@ -98,17 +95,21 @@ export const useQueueManager = () => {
     // Subscribe to store changes instead of using downloads in useEffect deps.
     // This fires outside the React render cycle, avoiding the infinite loop.
     const unsubscribe = useDownloadStore.subscribe((state, prevState) => {
-      // Only process when there's a status change that might need queue processing
+      const countActive = (ds: typeof state.downloads) =>
+        ds.filter((d) => d.status === 'downloading' || d.status === 'merging').length;
+      // A new job became eligible, a slot freed up (pause/cancel/remove),
+      // or a job finished/errored.
       const hasNewQueued = state.downloads.some(
-        (d) => d.status === 'queued' && !processedIds.current.has(d.id)
+        (d) => d.status === 'queued' && !prevState.downloads.some((p) => p.id === d.id && p.status === 'queued')
       );
       const hasFinishedOrError = state.downloads.some((d, i) => {
         const prev = prevState.downloads[i];
         return prev && (prev.status === 'downloading' || prev.status === 'merging') &&
                (d.status === 'finished' || d.status === 'error');
       });
+      const slotFreed = countActive(state.downloads) < countActive(prevState.downloads);
 
-      if (hasNewQueued || hasFinishedOrError) {
+      if (hasNewQueued || hasFinishedOrError || slotFreed) {
         processQueue();
       }
     });
@@ -120,20 +121,4 @@ export const useQueueManager = () => {
       unsubscribe();
     };
   }, []); // Empty deps — subscribe handles reactivity
-
-  // Clean up processedIds for removed/finished/error items periodically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const { downloads } = useDownloadStore.getState();
-      const activeIds = new Set(downloads.map((d) => d.id));
-      for (const id of processedIds.current) {
-        const item = downloads.find((d) => d.id === id);
-        if (!activeIds.has(id) || (item && (item.status === 'finished' || item.status === 'error'))) {
-          processedIds.current.delete(id);
-        }
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
 };

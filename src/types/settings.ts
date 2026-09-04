@@ -4,7 +4,7 @@ export interface AppSettings {
     proxyType: 'HTTP' | 'SOCKS5';
     proxyAddress: string;
     autoUpdateYtdlp: boolean;
-    cookieSource: 'none' | 'chrome' | 'firefox' | 'edge' | 'safari' | 'opera' | 'file';
+    cookieSource: 'default' | 'none' | 'chrome' | 'firefox' | 'edge' | 'safari' | 'opera' | 'brave' | 'chromium' | 'vivaldi' | 'whale' | 'file';
     cookieFilePath: string;
     speedLimit: number; // 0 = unlimited, value in KB/s
   };

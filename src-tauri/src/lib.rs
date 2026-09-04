@@ -44,8 +44,8 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 if let Some(state) = window.try_state::<AppState>() {
                     if let Ok(mut active) = state.active_downloads.lock() {
-                        for (id, child) in active.drain() {
-                            if let Err(e) = child.kill() {
+                        for (id, entry) in active.drain() {
+                            if let Err(e) = entry.child.kill() {
                                 eprintln!("[Cleanup] Failed to kill download process {}: {}", id, e);
                             } else {
                                 println!("[Cleanup] Killed download process: {}", id);

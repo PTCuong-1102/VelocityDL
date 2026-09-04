@@ -1,4 +1,5 @@
 use crate::proxy::apply_proxy_from_settings;
+use crate::state::AppState;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_shell::ShellExt;
@@ -93,7 +94,14 @@ pub fn start_app_update_download(
 /// sidecar `update` flow and streams its updating/ready lines to the
 /// frontend as `info-progress` events (same channel as get_video_info).
 #[tauri::command]
-pub async fn update_tools(app: AppHandle) -> Result<(), String> {
+pub async fn update_tools(app: AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
+    // Replacing tool binaries mid-download corrupts in-flight jobs
+    // (and fails on Windows file locks) — refuse while busy.
+    if let Ok(active) = state.active_downloads.lock() {
+        if !active.is_empty() {
+            return Err("Cannot update tools while downloads are running. Pause or wait, then retry.".to_string());
+        }
+    }
     apply_proxy_from_settings(&app);
     let (mut rx, _child) = app
         .shell()

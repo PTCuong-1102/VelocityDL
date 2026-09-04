@@ -12,6 +12,13 @@ import {
   cookieDomainMatches,
   buildCookieHeader,
 } from "../utils/cookies.ts";
+import {
+  mapBrowserToken,
+  parseWindowsProgId,
+  parseMacOSDefaultBrowser,
+  cookieDomainHintForUrl,
+} from "../utils/defaultBrowser.ts";
+import { validateCookieExport } from "./download.ts";
 
 Deno.test("isPlaylistUrl — true YouTube playlists", () => {
   assertEquals(isPlaylistUrl("https://www.youtube.com/watch?v=abc&list=PL123"), true);
@@ -77,6 +84,76 @@ Deno.test("facebookStoryPageVariants — desktop first, mobile fallback", () => 
   const v = facebookStoryPageVariants("https://www.facebook.com/stories/123");
   assertEquals(v[0], "https://www.facebook.com/stories/123");
   assert(v[1].includes("m.facebook.com"));
+});
+
+Deno.test("mapBrowserToken — ProgIds, bundle IDs, .desktop files", () => {
+  assertEquals(mapBrowserToken("ChromeHTML"), "chrome");
+  assertEquals(mapBrowserToken("MSEdgeHTM"), "edge");
+  assertEquals(mapBrowserToken("FirefoxURL-abc"), "firefox");
+  assertEquals(mapBrowserToken("OperaStable"), "opera");
+  assertEquals(mapBrowserToken("BraveHTML"), "brave");
+  assertEquals(mapBrowserToken("com.google.chrome"), "chrome");
+  assertEquals(mapBrowserToken("org.mozilla.firefox"), "firefox");
+  assertEquals(mapBrowserToken("com.apple.safari"), "safari");
+  assertEquals(mapBrowserToken("google-chrome.desktop"), "chrome");
+  assertEquals(mapBrowserToken("firefox.desktop"), "firefox");
+  assertEquals(mapBrowserToken("org.chromium.chromium"), "chromium");
+  assertEquals(mapBrowserToken("random-stuff"), null);
+});
+
+Deno.test("parseWindowsProgId — reads REG_SZ value", () => {
+  const out = [
+    "HKEY_CURRENT_USER\\...\\UserChoice",
+    "    ProgId    REG_SZ    ChromeHTML",
+  ].join("\n");
+  assertEquals(parseWindowsProgId(out), "chrome");
+  assertEquals(parseWindowsProgId("nothing here"), null);
+});
+
+Deno.test("parseMacOSDefaultBrowser — http handler bundle", () => {
+  const plutil = `
+    "LSHandlers" => [
+      0 => {
+        "LSHandlerURLScheme" => "http"
+        "LSHandlerRoleAll" => "org.mozilla.firefox"
+      }
+      1 => {
+        "LSHandlerURLScheme" => "ftp"
+        "LSHandlerRoleAll" => "com.apple.safari"
+      }
+    ]`;
+  assertEquals(parseMacOSDefaultBrowser(plutil), "firefox");
+  assertEquals(parseMacOSDefaultBrowser("empty"), null);
+});
+
+Deno.test("cookieDomainHintForUrl — registrable domain + aliases", () => {
+  assertEquals(cookieDomainHintForUrl("https://www.youtube.com/watch?v=x"), "youtube.com");
+  assertEquals(cookieDomainHintForUrl("https://youtu.be/x"), "youtube.com");
+  assertEquals(cookieDomainHintForUrl("https://fb.watch/x"), "facebook.com");
+  assertEquals(cookieDomainHintForUrl("https://m.facebook.com/stories/1"), "facebook.com");
+  assertEquals(cookieDomainHintForUrl("not a url"), "");
+});
+
+Deno.test("validateCookieExport — needs matching-domain cookies", async () => {
+  const good = await Deno.makeTempFile({ suffix: ".txt" });
+  await Deno.writeTextFile(
+    good,
+    ".facebook.com\tTRUE\t/\tTRUE\t0\tc_user\t123\n.youtube.com\tTRUE\t/\tTRUE\t0\tVISITOR\tz\n",
+  );
+  try {
+    assertEquals(await validateCookieExport(good, "www.facebook.com", "facebook.com"), true);
+    assertEquals(await validateCookieExport(good, "www.tiktok.com", "tiktok.com"), false);
+  } finally {
+    await Deno.remove(good);
+  }
+  const empty = await Deno.makeTempFile({ suffix: ".txt" });
+  await Deno.writeTextFile(empty, "# Netscape HTTP Cookie File\n");
+  try {
+    assertEquals(await validateCookieExport(empty, "www.facebook.com", "facebook.com"), false);
+  } finally {
+    await Deno.remove(empty);
+  }
+  assertEquals(await validateCookieExport("/nonexistent/file.txt", "x", "y"), false);
 });
 
 Deno.test("parseNetscapeCookies — skips comments and bad lines", () => {

@@ -37,6 +37,27 @@ export function parseMaxHeight(quality: string | undefined, fallback = 1080): nu
 }
 
 /**
+ * Bound persisted history so localStorage can't grow without limit.
+ * Drops the oldest finished items beyond the cap.
+ */
+export const MAX_FINISHED_ITEMS = 200;
+
+export function trimFinished(downloads: AnyDownloadItem[]): AnyDownloadItem[] {
+  const finishedIdx = downloads
+    .map((d, i) => ({ d, i }))
+    .filter(({ d }) => d.status === 'finished')
+    .sort(
+      (a, b) =>
+        (a.d.completedAt ?? a.d.createdAt) - (b.d.completedAt ?? b.d.createdAt)
+    );
+  if (finishedIdx.length <= MAX_FINISHED_ITEMS) return downloads;
+  const drop = new Set(
+    finishedIdx.slice(0, finishedIdx.length - MAX_FINISHED_ITEMS).map(({ i }) => i)
+  );
+  return downloads.filter((_, i) => !drop.has(i));
+}
+
+/**
  * Build the exact options object forwarded to the Rust/Deno backend.
  * Prefers per-item persisted options (set at creation from the download
  * form — incl. subtitles); falls back to legacy reconstruction from

@@ -13,6 +13,7 @@ interface DownloadCardProps {
   onResume?: (id: string) => void;
   onCancel?: (id: string) => void;
   onRetry?: (id: string) => void;
+  onRemove?: (id: string) => void;
 }
 
 export const DownloadCard: React.FC<DownloadCardProps> = ({
@@ -20,7 +21,8 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
   onPause,
   onResume,
   onCancel,
-  onRetry
+  onRetry,
+  onRemove
 }) => {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const isDownloading = item.status === 'downloading';
@@ -28,6 +30,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
   const isPaused = item.status === 'paused';
   const isError = item.status === 'error';
   const isQueued = item.status === 'queued';
+  const isAnalyzing = item.status === 'analyzing';
   const isActive = isDownloading || isMerging;
   const isAudio = item.mediaType === 'audio';
 
@@ -252,11 +255,12 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
           </button>
         )}
 
-        {onCancel && (isDownloading || isMerging || isPaused || isQueued) && (
+        {onCancel && (isDownloading || isMerging || isPaused || isQueued || isAnalyzing) && (
           <button 
             className="btn btn-ghost btn-icon flex-center"
             style={{ width: '32px', height: '32px', color: 'var(--error)' }}
             onClick={() => setShowCancelConfirm(true)}
+            title={isAnalyzing ? 'Remove this item' : 'Cancel download'}
           >
             <span className="icon">close</span>
           </button>
@@ -270,6 +274,17 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
             title="Retry download"
           >
             <span className="icon">refresh</span>
+          </button>
+        )}
+
+        {(isPaused || isQueued || isError) && onRemove && (
+          <button
+            className="btn btn-ghost btn-icon flex-center"
+            style={{ width: '32px', height: '32px', color: 'var(--on-surface-variant)' }}
+            onClick={() => onRemove(item.id)}
+            title="Remove from queue"
+          >
+            <span className="icon">delete</span>
           </button>
         )}
       </div>

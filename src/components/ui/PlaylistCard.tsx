@@ -12,6 +12,7 @@ interface PlaylistCardProps {
   onResume?: (id: string) => void;
   onCancel?: (id: string) => void;
   onRetry?: (id: string) => void;
+  onRemove?: (id: string) => void;
 }
 
 export const PlaylistCard: React.FC<PlaylistCardProps> = ({
@@ -19,13 +20,15 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
   onPause,
   onResume,
   onCancel,
-  onRetry
+  onRetry,
+  onRemove
 }) => {
   const [expanded, setExpanded] = useState(false);
 
   const isDownloading = item.status === 'downloading';
   const isPaused = item.status === 'paused';
   const isError = item.status === 'error';
+  const isQueued = item.status === 'queued';
   const platformColor = getPlatformColor(item.platform);
 
   return (
@@ -153,6 +156,17 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
               title="Retry download"
             >
               <span className="icon">refresh</span>
+            </button>
+          )}
+
+          {(isPaused || isQueued || isError) && onRemove && (
+            <button
+              className="btn btn-ghost btn-icon flex-center"
+              style={{ width: '32px', height: '32px', color: 'var(--on-surface-variant)' }}
+              onClick={() => onRemove(item.id)}
+              title="Remove from queue"
+            >
+              <span className="icon">delete</span>
             </button>
           )}
 
