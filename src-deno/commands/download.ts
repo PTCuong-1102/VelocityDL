@@ -133,8 +133,118 @@ export async function resolveCookieFile(
       message: "Could not read cookies from any installed browser — continuing without cookies. " +
         "Log in to the site in your browser, or set Cookie Authentication explicitly in Settings.",
     }));
+  } else {
+    // Explicit choice failing used to be completely silent — surface it.
+    console.log(JSON.stringify({
+      status: "updating",
+      message: `Could not read cookies from ${preferred} — continuing without cookies. ` +
+        "Close the browser and retry, or pick another source in Settings.",
+    }));
   }
   return blank;
+}
+
+export interface CookieCheckReport {
+  requestedSource: string;
+  resolvedSource: string | null;
+  cookieCount: number;
+  domains: string[];
+}
+
+/**
+ * Verify handler for Settings → "Verify Cookies": exports cookies for the
+ * given source and reports counts + covered domains (never the values).
+ * Prints {status:"success", data} or {status:"error", message} for Rust.
+ */
+export async function checkCookieSource(
+  requestedSource: string,
+  explicitFilePath: string,
+): Promise<void> {
+  const preferred = requestedSource || "default";
+  const fail = (message: string) => {
+    console.log(JSON.stringify({ status: "error", message }));
+  };
+
+  // Explicit cookies.txt file: validate it directly.
+  if (preferred === "file") {
+    let filePath = explicitFilePath;
+    if (!filePath) {
+      try {
+        filePath = (await getSettings())?.engine?.cookieFilePath || "";
+      } catch (_) { /* ignore */ }
+    }
+    if (!filePath) {
+      fail("No cookies.txt file selected. Browse for one first.");
+      return;
+    }
+    let text = "";
+    try {
+      text = await Deno.readTextFile(filePath);
+    } catch (_) {
+      fail(`Cannot read cookies file: ${filePath}`);
+      return;
+    }
+    const cookies = parseNetscapeCookies(text);
+    if (cookies.length === 0) {
+      fail("The selected file contains no usable cookies. Re-export it from your browser.");
+      return;
+    }
+    const domains = [...new Set(cookies.map((c) => c.domain.replace(/^\./, "")))].slice(0, 12);
+    const report: CookieCheckReport = {
+      requestedSource: preferred,
+      resolvedSource: "file",
+      cookieCount: cookies.length,
+      domains,
+    };
+    console.log(JSON.stringify({ status: "success", data: report }));
+    return;
+  }
+
+  if (preferred === "none") {
+    fail("Cookie source is set to None — nothing to verify.");
+    return;
+  }
+
+  const sources: string[] = [];
+  if (preferred === "default") {
+    const detected = await detectDefaultBrowser();
+    if (detected) sources.push(detected);
+    for (const c of ["chrome", "edge", "firefox", "brave", "opera", "chromium", "vivaldi", "safari", "whale"]) {
+      if (!sources.includes(c)) sources.push(c);
+    }
+  } else {
+    sources.push(preferred);
+  }
+
+  const tried: string[] = [];
+  for (const src of sources) {
+    tried.push(src);
+    const temp = await extractCookiesToFile(src);
+    if (!temp) continue;
+    try {
+      const text = await Deno.readTextFile(temp);
+      const cookies = parseNetscapeCookies(text);
+      if (cookies.length === 0) continue;
+      const domains = [...new Set(cookies.map((c) => c.domain.replace(/^\./, "")))].slice(0, 12);
+      const report: CookieCheckReport = {
+        requestedSource: preferred,
+        resolvedSource: src,
+        cookieCount: cookies.length,
+        domains,
+      };
+      console.log(JSON.stringify({ status: "success", data: report }));
+      return;
+    } finally {
+      try {
+        await Deno.remove(temp);
+      } catch (_) { /* ignore */ }
+    }
+  }
+
+  fail(
+    `Could not read cookies from ${tried.join(", ")}. ` +
+    "Close the browser (it may lock its cookie database) and retry, or use a cookies.txt file."
+  );
 }
 
 export async function downloadMedia(

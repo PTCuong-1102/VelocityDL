@@ -32,6 +32,7 @@ pub fn run() {
             commands::settings::save_settings,
             commands::settings::set_launch_on_boot,
             commands::settings::is_launch_on_boot,
+            commands::settings::check_cookies,
             commands::filesystem::open_file,
             commands::filesystem::open_folder,
             commands::update::check_app_update,

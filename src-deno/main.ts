@@ -1,6 +1,6 @@
 import { ensureYtdlpInstalled, ensureFfmpegInstalled, ensureSpotdlInstalled, ensureGallerydlInstalled, ensureInstaloaderInstalled, maybeAutoUpdateTools, touchToolsMarker } from "./commands/update.ts";
 import { getVideoInfo } from "./commands/info.ts";
-import { downloadMedia, DownloadOptions } from "./commands/download.ts";
+import { downloadMedia, DownloadOptions, checkCookieSource } from "./commands/download.ts";
 import { checkAppUpdate, downloadAppUpdate } from "./commands/appUpdate.ts";
 import { getSettings } from "./utils/paths.ts";
 
@@ -10,7 +10,7 @@ async function main() {
   if (!command) {
     console.log(JSON.stringify({ 
       status: "error", 
-      message: "No command provided. Supported: info, download, update, check-app-update, download-app-update" 
+      message: "No command provided. Supported: info, download, update, check-app-update, download-app-update, check-cookies" 
     }));
     Deno.exit(1);
   }
@@ -35,6 +35,14 @@ async function main() {
 
     // 2. For core download commands, ensure dependencies are installed.
     // maybeAutoUpdateTools honors engine.autoUpdateYtdlp (weekly force-update).
+    // check-cookies is a lightweight probe: skip the ensure flow so a broken
+    // tool install can't mask the cookie result.
+    if (command === "check-cookies") {
+      const source = Deno.args[1] || "default";
+      const filePath = Deno.args[2] || "";
+      await checkCookieSource(source, filePath);
+      return;
+    }
     if (command !== "update" && command !== "check-app-update" && command !== "download-app-update") {
       await maybeAutoUpdateTools(settings?.engine?.autoUpdateYtdlp !== false);
       await ensureYtdlpInstalled();

@@ -1,7 +1,9 @@
 use std::fs;
 use serde_json::{json, Value};
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_shell::ShellExt;
+use tauri_plugin_shell::process::CommandEvent;
 
 #[tauri::command]
 pub fn get_default_download_path() -> Option<String> {
@@ -97,4 +99,50 @@ pub fn set_launch_on_boot(app: tauri::AppHandle, enabled: bool) -> Result<(), St
 pub fn is_launch_on_boot(app: tauri::AppHandle) -> Result<bool, String> {
     use tauri_plugin_autostart::ManagerExt;
     app.autolaunch().is_enabled().map_err(|e| e.to_string())
+}
+
+/// Verify a cookie source end-to-end: spawns the sidecar `check-cookies`
+/// probe (browser export + parse) and returns its report
+/// {requestedSource, resolvedSource, cookieCount, domains}.
+#[tauri::command]
+pub async fn check_cookies(app: AppHandle, source: String, file_path: String) -> Result<Value, String> {
+    let (mut rx, _child) = app
+        .shell()
+        .sidecar("deno-engine")
+        .map_err(|e| e.to_string())?
+        .args(&["check-cookies", &source, &file_path])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    let mut output_str = String::new();
+
+    while let Some(event) = rx.recv().await {
+        match event {
+            CommandEvent::Stdout(line_bytes) => {
+                output_str.push_str(&String::from_utf8_lossy(&line_bytes));
+            }
+            CommandEvent::Stderr(line_bytes) => {
+                let err_line = String::from_utf8_lossy(&line_bytes);
+                eprintln!("[Sidecar Cookie Check Error]: {}", err_line);
+            }
+            CommandEvent::Terminated(_) => break,
+            _ => {}
+        }
+    }
+
+    for line in output_str.lines() {
+        if let Ok(json_val) = serde_json::from_str::<Value>(line) {
+            if json_val.get("status").and_then(|s| s.as_str()) == Some("success") {
+                return Ok(json_val.get("data").cloned().unwrap_or(Value::Null));
+            } else if json_val.get("status").and_then(|s| s.as_str()) == Some("error") {
+                return Err(json_val
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .unwrap_or("Cookie check failed")
+                    .to_string());
+            }
+        }
+    }
+
+    Err("Could not verify cookies: no result from sidecar".to_string())
 }

@@ -24,6 +24,11 @@ export const SettingsPage: React.FC = () => {
   // Tool-update states
   const [toolsStatus, setToolsStatus] = useState<'idle' | 'updating' | 'ready' | 'error'>('idle');
   const [toolsMsg, setToolsMsg] = useState('');
+  // Cookie verification states
+  const [cookieCheck, setCookieCheck] = useState<{
+    status: 'idle' | 'checking' | 'ok' | 'error';
+    msg: string;
+  }>({ status: 'idle', msg: '' });
   const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'no-update' | 'downloading' | 'ready' | 'error'>('idle');
   const [updateInfo, setUpdateInfo] = useState<{
     latestVersion: string;
@@ -173,9 +178,35 @@ export const SettingsPage: React.FC = () => {
       const selectedPath = await invoke<string | null>('browse_cookie_file');
       if (selectedPath) {
         updateSetting('engine', 'cookieFilePath', selectedPath);
+        // Pass the fresh path directly — the debounced save may not have
+        // persisted it yet when verification reads settings.
+        handleVerifyCookies('file', selectedPath);
       }
     } catch (err) {
       console.error('Failed to browse cookie file:', err);
+    }
+  };
+
+  const handleVerifyCookies = async (source?: string, filePath?: string) => {
+    const src = source ?? settings.engine.cookieSource;
+    if (src === 'none') {
+      setCookieCheck({ status: 'idle', msg: '' });
+      return;
+    }
+    setCookieCheck({ status: 'checking', msg: 'Reading browser cookies…' });
+    try {
+      const res = await invoke<any>('check_cookies', {
+        source: src,
+        filePath: src === 'file' ? (filePath ?? settings.engine.cookieFilePath ?? '') : '',
+      });
+      const domains = Array.isArray(res?.domains) ? res.domains.slice(0, 5).join(', ') : '';
+      setCookieCheck({
+        status: 'ok',
+        msg: `${res?.cookieCount ?? 0} cookies from ${res?.resolvedSource ?? src}${domains ? ` (${domains})` : ''}`,
+      });
+    } catch (err) {
+      console.error(err);
+      setCookieCheck({ status: 'error', msg: String(err) });
     }
   };
 
@@ -338,7 +369,13 @@ export const SettingsPage: React.FC = () => {
                       flexGrow: 1
                     }}
                     value={settings.engine.cookieSource}
-                    onChange={(e) => updateSetting('engine', 'cookieSource', e.target.value as any)}
+                    onChange={(e) => {
+                      const v = e.target.value as any;
+                      updateSetting('engine', 'cookieSource', v);
+                      // Verify immediately so a broken source is caught here,
+                      // not later at download time with no feedback.
+                      handleVerifyCookies(v);
+                    }}
                   >
                     <option value="default">System Default Browser (Recommended)</option>
                     <option value="none">No Cookies (None)</option>
@@ -365,6 +402,26 @@ export const SettingsPage: React.FC = () => {
                     <Button variant="ghost" onClick={handleBrowseCookieFile} style={{ height: '38px' }}>
                       Browse
                     </Button>
+                  </div>
+                )}
+                {settings.engine.cookieSource !== 'none' && (
+                  <div className="flex-row gap-sm" style={{ marginTop: '4px', alignItems: 'center' }}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleVerifyCookies()}
+                      style={{ height: '32px', fontSize: '12px' }}
+                    >
+                      {cookieCheck.status === 'checking' ? 'Checking…' : 'Verify Cookies'}
+                    </Button>
+                    {cookieCheck.status === 'ok' && (
+                      <span style={{ fontSize: '12px', color: '#6bd8cb' }}>✓ {cookieCheck.msg}</span>
+                    )}
+                    {cookieCheck.status === 'error' && (
+                      <span style={{ fontSize: '12px', color: '#ffb4ab' }}>✕ {cookieCheck.msg}</span>
+                    )}
+                    {cookieCheck.status === 'checking' && (
+                      <span className="text-muted" style={{ fontSize: '12px' }}>{cookieCheck.msg}</span>
+                    )}
                   </div>
                 )}
                 <span className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
