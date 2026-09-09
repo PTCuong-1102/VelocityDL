@@ -3,7 +3,7 @@
 #
 # Usage:
 #   bash scripts/make-linux-tar.sh [version] [arch]
-#   bash scripts/make-linux-tar.sh 0.6.2 x86_64
+#   bash scripts/make-linux-tar.sh 0.6.3 x86_64
 #
 # Inputs (produced by `npm run tauri build` on Linux):
 #   src-tauri/target/release/velocity-dl                        # app binary
