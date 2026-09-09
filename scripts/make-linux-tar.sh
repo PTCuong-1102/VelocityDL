@@ -22,7 +22,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${1:-$(node -p "require('$ROOT/package.json').version" 2>/dev/null || echo 0.6.2)}"
+VERSION="${1:-$(node -p "require('$ROOT/package.json').version" 2>/dev/null || echo 0.6.3)}"
 ARCH="${2:-x86_64}"
 TRIPLE="x86_64-unknown-linux-gnu"
 if [[ "$ARCH" == "aarch64" || "$ARCH" == "arm64" ]]; then

@@ -39,6 +39,7 @@ pub fn run() {
             commands::update::start_app_update_download,
             commands::update::update_tools,
             commands::update::exit_app,
+            commands::update::install_app_update,
         ])
         // Kill all active downloads when the window is closed
         .on_window_event(|window, event| {

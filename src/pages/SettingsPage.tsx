@@ -20,7 +20,7 @@ export const SettingsPage: React.FC = () => {
   );
 
   // App Update States
-  const [currentVersion, setCurrentVersion] = useState('0.6.2');
+  const [currentVersion, setCurrentVersion] = useState('0.6.3');
   // Tool-update states
   const [toolsStatus, setToolsStatus] = useState<'idle' | 'updating' | 'ready' | 'error'>('idle');
   const [toolsMsg, setToolsMsg] = useState('');
@@ -35,6 +35,9 @@ export const SettingsPage: React.FC = () => {
     changelog: string;
     downloadUrl: string;
     fileName: string;
+    distroBase?: string;
+    distroName?: string;
+    installerType?: string;
   } | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [errorMsg, setErrorMsg] = useState('');
@@ -63,6 +66,18 @@ export const SettingsPage: React.FC = () => {
     }
   });
 
+  const handleInstallUpdate = async (pathOverride?: string) => {
+    const targetPath = pathOverride || installerPath;
+    if (!targetPath) return;
+    try {
+      addToast('info', 'Launching update installer...');
+      await invoke('install_app_update', { filePath: targetPath });
+    } catch (err) {
+      console.error(err);
+      addToast('error', `Failed to execute installer: ${err}`);
+    }
+  };
+
   // Listen for update download progress events from sidecar
   useTauriEvent<any>('update-progress', (event) => {
     const payload = event.payload;
@@ -72,6 +87,8 @@ export const SettingsPage: React.FC = () => {
     } else if (payload.status === 'ready' && payload.filePath) {
       setUpdateStatus('ready');
       setInstallerPath(payload.filePath);
+      // Automatically install update once downloaded
+      handleInstallUpdate(payload.filePath);
     } else if (payload.status === 'error') {
       setUpdateStatus('error');
       setErrorMsg(payload.message || 'Download failed');
@@ -90,6 +107,9 @@ export const SettingsPage: React.FC = () => {
           changelog: res.changelog,
           downloadUrl: res.downloadUrl,
           fileName: res.fileName,
+          distroBase: res.distroBase,
+          distroName: res.distroName,
+          installerType: res.installerType,
         });
       } else {
         setUpdateStatus('no-update');
@@ -117,17 +137,6 @@ export const SettingsPage: React.FC = () => {
       console.error(err);
       setUpdateStatus('error');
       setErrorMsg(String(err));
-    }
-  };
-
-  const handleInstallUpdate = async () => {
-    if (!installerPath) return;
-    try {
-      await invoke('open_file', { path: installerPath });
-      await invoke('exit_app');
-    } catch (err) {
-      console.error(err);
-      addToast('error', `Failed to execute installer: ${err}`);
     }
   };
 
@@ -625,6 +634,13 @@ export const SettingsPage: React.FC = () => {
                     <span className="icon" style={{ fontSize: '18px' }}>info</span>
                     <span style={{ fontWeight: 500 }}>New update v{updateInfo.latestVersion}</span>
                   </div>
+
+                  {updateInfo.fileName && (
+                    <div style={{ fontSize: '11px', color: 'var(--secondary-color)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span className="icon" style={{ fontSize: '14px' }}>inventory_2</span>
+                      <span>Package: <strong>{updateInfo.fileName}</strong>{updateInfo.distroName ? ` (${updateInfo.distroName})` : ''}</span>
+                    </div>
+                  )}
                   
                   {/* Changelog box */}
                   <div 
@@ -645,7 +661,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
 
                   <Button variant="primary" onClick={handleDownloadUpdate} style={{ width: '100%', marginTop: '4px' }}>
-                    Download &amp; Install
+                    Download &amp; Auto-Install
                   </Button>
                 </div>
               )}
@@ -677,11 +693,13 @@ export const SettingsPage: React.FC = () => {
                 <div className="flex-col gap-sm">
                   <div className="flex-row gap-xs" style={{ alignItems: 'center', color: '#6bd8cb' }}>
                     <span className="icon" style={{ fontSize: '18px' }}>download_done</span>
-                    <span style={{ fontWeight: 500 }}>Download completed!</span>
+                    <span style={{ fontWeight: 500 }}>Downloaded! Launching installer...</span>
                   </div>
-                  <span className="text-muted" style={{ fontSize: '11px' }}>The update has been downloaded. Ready to install.</span>
-                  <Button variant="primary" onClick={handleInstallUpdate} style={{ width: '100%', marginTop: '4px' }}>
-                    Restart &amp; Install
+                  <span className="text-muted" style={{ fontSize: '11px' }}>
+                    The installer is launching automatically. Click below if you need to re-trigger.
+                  </span>
+                  <Button variant="primary" onClick={() => handleInstallUpdate()} style={{ width: '100%', marginTop: '4px' }}>
+                    Restart &amp; Install Now
                   </Button>
                 </div>
               )}

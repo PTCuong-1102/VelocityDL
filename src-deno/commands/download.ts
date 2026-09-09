@@ -48,11 +48,16 @@ async function tryExportCookies(spec: string): Promise<CookieExportResult> {
   let tempFile = "";
   try {
     tempFile = await Deno.makeTempFile({ suffix: ".txt" });
+    // Pre-seed with standard Netscape header so yt-dlp does not reject the empty file
+    await Deno.writeTextFile(tempFile, "# Netscape HTTP Cookie File\n");
     const command = new Deno.Command(ytdlpPath, {
       args: [
         "--cookies-from-browser", spec,
         "--cookies", tempFile,
         "--skip-download",
+        "--no-playlist",
+        "--playlist-items", "0",
+        "--no-warnings",
         "https://www.youtube.com"
       ],
       stdout: "null",
@@ -76,7 +81,7 @@ async function tryExportCookies(spec: string): Promise<CookieExportResult> {
       } catch (_) { /* ignore */ }
     }
     const msg = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: msg.includes("abort") || msg.includes("Timeout") ? "timed out after 20s (browser may lock its cookie database — close it and retry)" : msg };
+    return { ok: false, error: msg.includes("abort") || msg.includes("Timeout") ? "timed out after 20s while reading browser cookies" : msg };
   }
 }
 
@@ -556,23 +561,24 @@ async function downloadYtdlp(
   } else {
     const height = options.maxHeight > 0 ? options.maxHeight : 1080;
     args.push("-f", `bv*[height<=${height}]+ba/b[height<=${height}]/best`);
-    args.push("--merge-output-format", "mp4");
+    args.push("--merge-output-format", "mp4/mkv");
   }
 
   if (options.selectedSubtitles && options.selectedSubtitles.length > 0) {
     args.push("--write-subs", "--write-auto-subs");
     args.push("--sub-langs", options.selectedSubtitles.join(","));
     if (options.embedSubs !== false) {
-      args.push("--embed-subs", "--compat-options", "no-keep-subs");
+      args.push("--embed-subs", "--compat-options", "no-keep-subs", "--convert-subs", "srt");
     }
   } else if (options.extractSubs) {
     args.push("--write-subs", "--write-auto-subs", "--sub-langs", "all");
     if (options.embedSubs !== false) {
-      args.push("--embed-subs", "--compat-options", "no-keep-subs");
+      args.push("--embed-subs", "--compat-options", "no-keep-subs", "--convert-subs", "srt");
     }
   }
 
-  args.push("-o", `${saveDir}/%(title)s.%(ext)s`);
+  args.push("--windows-filenames");
+  args.push("-o", `${saveDir}/%(title).200B.%(ext)s`);
 
   // Handle cookies
   if (cookieFilePath) {
@@ -585,6 +591,22 @@ async function downloadYtdlp(
   if (speedLimit > 0) {
     args.push("--limit-rate", `${speedLimit}K`);
   }
+
+  // Anti-throttling & speed optimizations for playlists and multi-stream downloads:
+  // 1. Concurrent fragments: pull 4 fragments in parallel (bypasses single-connection throttling)
+  // 2. HTTP chunk size: 10MB chunking continuously refreshes CDN bandwidth allocation
+  // 3. Throttled rate: auto re-extract stream URL if CDN drops speed below 100KB/s
+  // 4. Retry & Fixup: retry failed fragments up to 10 times and automatically fix container/atom faults
+  // 5. Postprocessor: allow FFmpeg to mux Opus/experimental codecs into container safely
+  args.push(
+    "--concurrent-fragments", "4",
+    "--http-chunk-size", "10M",
+    "--throttled-rate", "100K",
+    "--retries", "10",
+    "--fragment-retries", "10",
+    "--fixup", "detect_or_warn",
+    "--postprocessor-args", "Merger:-strict experimental"
+  );
 
   args.push(
     "--progress-template", 
@@ -819,7 +841,10 @@ export function extractFacebookStoryMedia(html: string): FacebookStoryMedia {
 
   const videos = [
     ...pick(/"playable_url_quality_hd"\s*:\s*"([^"]+)"/g),
+    ...pick(/"browser_native_hd_url"\s*:\s*"([^"]+)"/g),
     ...pick(/"playable_url"\s*:\s*"([^"]+)"/g),
+    ...pick(/"browser_native_sd_url"\s*:\s*"([^"]+)"/g),
+    ...pick(/"progressive_download_url"\s*:\s*"([^"]+)"/g),
     ...pick(/<meta[^>]+property="og:video(?::url)?"[^>]+content="([^"]+)"/gi),
   ];
   const images = videos.length === 0
@@ -968,7 +993,7 @@ async function downloadFacebookStory(
   for (const variant of facebookStoryPageVariants(url)) {
     try {
       html = await fetchFacebookPage(variant, cookieHeader);
-      if (html.includes("playable_url") || html.includes("og:video") || html.includes("og:image")) break;
+      if (html.includes("playable_url") || html.includes("browser_native") || html.includes("og:video") || html.includes("og:image")) break;
     } catch (err) {
       lastErr = err instanceof Error ? err.message : String(err);
       // Auth errors are definitive — don't mask them with fallbacks.
@@ -983,9 +1008,9 @@ async function downloadFacebookStory(
     ? videos.map((u) => ({ url: u, ext: "mp4" }))
     : images.map((u) => ({ url: u, ext: u.includes(".png") ? "png" : "jpg" }));
   if (targets.length === 0) {
-    // Distinguish expired/missing stories from parser breakage.
-    if (/This content isn't available|content not found|story.*(expired|unavailable)/i.test(html)) {
-      throw new Error("This story is unavailable (deleted or expired after 24h).");
+    // Distinguish expired/missing stories or private permission issues from parser breakage.
+    if (/This content isn't available|content not found|story.*(expired|unavailable)|nội dung này hiện không khả dụng|không thể hiển thị/i.test(html)) {
+      throw new Error("This story is unavailable (it may be expired after 24h, deleted, or private/friends-only and your logged-in account does not have permission to view it).");
     }
     throw new Error(
       "No playable media found on the story page — Facebook may have changed " +

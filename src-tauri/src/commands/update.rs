@@ -158,3 +158,93 @@ pub async fn update_tools(app: AppHandle, state: tauri::State<'_, AppState>) -> 
 pub fn exit_app(app: AppHandle) {
     app.exit(0);
 }
+
+#[tauri::command]
+pub async fn install_app_update(app: AppHandle, file_path: String) -> Result<(), String> {
+    let path = std::path::Path::new(&file_path);
+    if !path.exists() {
+        return Err(format!("Installer file not found at: {}", file_path));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        Command::new(&file_path)
+            .spawn()
+            .map_err(|e| format!("Failed to launch installer executable: {}", e))?;
+        app.exit(0);
+        return Ok(());
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        Command::new("open")
+            .arg(&file_path)
+            .spawn()
+            .map_err(|e| format!("Failed to open installer: {}", e))?;
+        app.exit(0);
+        return Ok(());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        use std::process::Command;
+
+        let lower = file_path.to_lowercase();
+        if lower.ends_with(".appimage") {
+            if let Ok(metadata) = std::fs::metadata(&file_path) {
+                let mut perms = metadata.permissions();
+                perms.set_mode(0o755);
+                let _ = std::fs::set_permissions(&file_path, perms);
+            }
+            Command::new(&file_path)
+                .spawn()
+                .map_err(|e| format!("Failed to launch AppImage: {}", e))?;
+            app.exit(0);
+            return Ok(());
+        } else if lower.ends_with(".deb") {
+            let res = Command::new("pkexec")
+                .args(&["apt", "install", "-y", &file_path])
+                .spawn();
+            if res.is_err() {
+                Command::new("pkexec")
+                    .args(&["dpkg", "-i", &file_path])
+                    .spawn()
+                    .map_err(|e| format!("Failed to install .deb package: {}", e))?;
+            }
+            app.exit(0);
+            return Ok(());
+        } else if lower.ends_with(".rpm") {
+            let res = Command::new("pkexec")
+                .args(&["dnf", "install", "-y", &file_path])
+                .spawn();
+            if res.is_err() {
+                Command::new("pkexec")
+                    .args(&["rpm", "-Uvh", &file_path])
+                    .spawn()
+                    .map_err(|e| format!("Failed to install .rpm package: {}", e))?;
+            }
+            app.exit(0);
+            return Ok(());
+        } else if lower.ends_with(".pkg.tar.zst") || lower.ends_with(".pkg.tar.xz") {
+            Command::new("pkexec")
+                .args(&["pacman", "-U", "--noconfirm", &file_path])
+                .spawn()
+                .map_err(|e| format!("Failed to install package with pacman: {}", e))?;
+            app.exit(0);
+            return Ok(());
+        } else {
+            Command::new("xdg-open")
+                .arg(&file_path)
+                .spawn()
+                .map_err(|e| format!("Failed to open file: {}", e))?;
+            return Ok(());
+        }
+    }
+
+    #[allow(unreachable_code)]
+    Ok(())
+}
+

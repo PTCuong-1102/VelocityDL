@@ -220,9 +220,9 @@ export function buildCookieSpecs(
   for (const src of browsers) {
     const profiles = profilesByBrowser[src] ?? [];
     const keyrings = keyringVariants(src, os);
-    // Explicit profiles first (most likely the right login), then bare key.
-    const profileFirst: (string | undefined)[] = [...profiles, undefined];
-    for (const profile of profileFirst) {
+    // Bare browser first (yt-dlp auto-resolves default profile and keyring best), then explicit profiles.
+    const candidates: (string | undefined)[] = [undefined, ...profiles];
+    for (const profile of candidates) {
       for (const kr of keyrings) {
         if (specs.length >= maxSpecs) return specs;
         let spec = src;

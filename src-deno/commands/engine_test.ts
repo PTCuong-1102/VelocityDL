@@ -237,15 +237,15 @@ Deno.test("keyringVariants — only Linux Chromium family", () => {
   assertEquals(keyringVariants("chrome", "windows"), [""]);
 });
 
-Deno.test("buildCookieSpecs — profiles first, capped, deduped", () => {
+Deno.test("buildCookieSpecs — bare browser first, capped, deduped", () => {
   const specs = buildCookieSpecs(
     ["chrome", "firefox"],
     { chrome: ["/p/Default", "/p/Profile 1"], firefox: [] },
     "linux",
     100,
   );
-  // explicit profiles before bare key, keyring variants per profile
-  assert(specs.indexOf("chrome:/p/Default") < specs.indexOf("chrome"));
+  // bare browser before explicit profiles for fast resolution
+  assert(specs.indexOf("chrome") < specs.indexOf("chrome:/p/Default"));
   assert(specs.includes("chrome+gnomekeyring:/p/Default"));
   assert(specs.includes("firefox"));
   assertEquals(buildCookieSpecs(["chrome"], {}, "linux", 2).length, 2);
