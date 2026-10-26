@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AnyDownloadItem, isPlaylistItem } from '../../types/download';
 import { formatBytes } from '../../utils/format';
 import { getPlatformColor } from '../../utils/platform';
+import { useI18n } from '../../i18n';
 import PlatformIcon from '../shared/PlatformIcon';
 
 /** Quality override for re-downloading a history entry. */
@@ -28,7 +29,8 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
   onRedownload,
   onRemove
 }) => {
-  const platformColor = getPlatformColor(item.platform);
+
+  const { t } = useI18n();  const platformColor = getPlatformColor(item.platform);
   // Play needs a real file; a playlist parent outputPath is a directory.
   const canPlay = !!item.outputPath && !isPlaylistItem(item);
   // Reveal needs at least one known path (parent dir or any child file).
@@ -226,7 +228,7 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
                 height: '28px'
               }}
               onClick={() => onOpenFolder(item)}
-              title="Open enclosing folder"
+              title={t('common.openEnclosing')}
             >
               <span className="icon" style={{ fontSize: '16px' }}>folder_open</span>
             </button>
@@ -253,7 +255,7 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
                   }}
                 >
                   {[
-                    { label: 'Current quality', maxHeight: 0 },
+                    { label: t('finished.currentQuality'), maxHeight: 0 },
                     { label: '1080p', maxHeight: 1080 },
                     { label: '720p', maxHeight: 720 },
                     { label: '480p', maxHeight: 480 },
@@ -279,7 +281,7 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
                   height: '28px'
                 }}
                 onClick={handleRedownloadClick}
-                title="Download again (choose a different quality)"
+                title={t('finished.redownload')}
               >
                 <span className="icon" style={{ fontSize: '16px' }}>refresh</span>
               </button>
@@ -295,7 +297,7 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
                 color: 'var(--error)'
               }}
               onClick={() => onRemove(item.id)}
-              title="Remove from history"
+              title={t('finished.removeHistory')}
             >
               <span className="icon" style={{ fontSize: '16px' }}>delete</span>
             </button>

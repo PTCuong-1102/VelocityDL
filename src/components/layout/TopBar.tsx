@@ -3,11 +3,13 @@ import SearchBar from '../shared/SearchBar';
 import { useDownloadStore } from '../../stores/downloadStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import useToastStore from '../../stores/toastStore';
+import { useI18n } from '../../i18n';
 
 export const TopBar: React.FC = () => {
   const { downloads } = useDownloadStore();
   const { settings } = useSettingsStore();
   const { addToast } = useToastStore();
+  const { t } = useI18n();
 
   // Calculate speed and active threads
   const activeDownloads = downloads.filter((d) => d.status === 'downloading');
@@ -64,7 +66,7 @@ export const TopBar: React.FC = () => {
               {formatSpeed(totalSpeed)}
             </span>
             <span className="text-muted" style={{ fontSize: '11px' }}>
-              ({activeDownloads.length} active)
+              ({t('topbar.active', { n: activeDownloads.length })})
             </span>
           </div>
         )}
@@ -75,7 +77,7 @@ export const TopBar: React.FC = () => {
           style={{ fontSize: '12px', alignItems: 'center' }}
         >
           <span className="icon" style={{ fontSize: '16px' }}>memory</span>
-          <span className="mono">{settings.engine.concurrentThreads} threads</span>
+          <span className="mono">{settings.engine.concurrentThreads} {t('common.threadsUnit')}</span>
         </div>
 
         {/* Divider */}
@@ -87,11 +89,11 @@ export const TopBar: React.FC = () => {
         <button
           className="btn btn-ghost btn-icon flex-center"
           style={{ border: 'none' }}
-          title="Keyboard shortcuts: Ctrl+1 Dashboard, Ctrl+2 Queue, Ctrl+3 Finished, Ctrl+4 Settings, Esc Dashboard"
+          title={t('topbar.shortcuts')}
           onClick={() =>
             addToast(
               'info',
-              'Shortcuts: Ctrl+1 Dashboard · Ctrl+2 Queue · Ctrl+3 Finished · Ctrl+4 Settings · Esc Dashboard',
+              t('topbar.shortcutsToast'),
               6000
             )
           }

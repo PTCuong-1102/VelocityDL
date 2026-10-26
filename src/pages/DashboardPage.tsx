@@ -9,6 +9,7 @@ import { useDownloadStore } from '../stores/downloadStore';
 import useHistoryStore from '../stores/historyStore';
 import { useDownload } from '../hooks/useDownload';
 import useToastStore from '../stores/toastStore';
+import { useI18n } from '../i18n';
 import { Platform, isPlaylistItem } from '../types/download';
 import { formatBytes } from '../utils/format';
 
@@ -27,6 +28,7 @@ export const DashboardPage: React.FC = () => {
   const { history } = useHistoryStore();
   const { startDownload, pauseDownload, resumeDownload, cancelDownload, retryDownload, removeDownloadItem } = useDownload();
   const { addToast } = useToastStore();
+  const { t } = useI18n();
 
   // Show only active/downloading/queued/paused items, max 3
   const activeItems = downloads
@@ -45,10 +47,10 @@ export const DashboardPage: React.FC = () => {
     : 100;
 
   const statsCards = [
-    { icon: 'check_circle', label: 'Completed', value: String(totalCompleted), color: '#6bd8cb' },
-    { icon: 'sync', label: 'Active', value: String(totalActive), color: '#c3c0ff' },
-    { icon: 'data_usage', label: 'Data Downloaded', value: formatBytes(totalDataBytes), color: '#ffb95f' },
-    { icon: 'trending_up', label: 'Success Rate', value: `${successRate}%`, color: successRate >= 80 ? '#6bd8cb' : '#ffb4ab' },
+    { icon: 'check_circle', label: t('dash.completed'), value: String(totalCompleted), color: '#6bd8cb' },
+    { icon: 'sync', label: t('dash.active'), value: String(totalActive), color: '#c3c0ff' },
+    { icon: 'data_usage', label: t('dash.dataDownloaded'), value: formatBytes(totalDataBytes), color: '#ffb95f' },
+    { icon: 'trending_up', label: t('dash.successRate'), value: `${successRate}%`, color: successRate >= 80 ? '#6bd8cb' : '#ffb4ab' },
   ];
 
   const handleDownload = (url: string, options: DownloadOptions, prefetchedInfo?: any) => {
@@ -66,7 +68,7 @@ export const DashboardPage: React.FC = () => {
       try {
         window.open(target, '_blank', 'noopener,noreferrer');
       } catch {
-        addToast('error', `Could not open ${target}`);
+        addToast('error', t('dash.couldNotOpen', { url: target }));
       }
     }
   };
@@ -77,7 +79,7 @@ export const DashboardPage: React.FC = () => {
       <div>
         <h1>VelocityDL</h1>
         <p className="text-muted mt-sm" style={{ fontSize: '14px' }}>
-          Next-generation high-speed video downloader engine powered by Deno &amp; Tauri.
+          {t('dash.tagline')}
         </p>
       </div>
 
@@ -137,13 +139,13 @@ export const DashboardPage: React.FC = () => {
             pointerEvents: 'none'
           }}
         />
-        <h2 style={{ marginBottom: '16px', fontWeight: 600 }}>Download New Media</h2>
+        <h2 style={{ marginBottom: '16px', fontWeight: 600 }}>{t('dash.downloadNew')}</h2>
         <URLInput onDownload={handleDownload} />
       </GlassPanel>
 
       {/* Quick Start Launcher Grid */}
       <div className="flex-col gap-md">
-        <h2>Supported Platforms</h2>
+        <h2>{t('dash.platforms')}</h2>
         <div 
           style={{
             display: 'grid',
@@ -164,13 +166,12 @@ export const DashboardPage: React.FC = () => {
       {activeItems.length > 0 && (
         <div className="flex-col gap-md" style={{ marginTop: '8px' }}>
           <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2>Active Downloads</h2>
+            <h2>{t('dash.activeDownloads')}</h2>
             <button 
               className="btn btn-ghost"
               style={{ padding: '4px 12px', fontSize: '12px', height: '28px' }}
               onClick={() => navigate('/queue')}
-            >
-              View Queue
+            >              {t('dash.viewQueue')}
             </button>
           </div>
           <div className="flex-col gap-md">

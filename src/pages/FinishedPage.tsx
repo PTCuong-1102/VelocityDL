@@ -3,6 +3,7 @@ import FinishedCard from '../components/ui/FinishedCard';
 import useHistoryStore from '../stores/historyStore';
 import { useUIStore } from '../stores/uiStore';
 import { useToastStore } from '../stores/toastStore';
+import { useI18n } from '../i18n';
 import { AnyDownloadItem, isPlaylistItem } from '../types/download';
 import { invoke } from '@tauri-apps/api/core';
 import { useDownload } from '../hooks/useDownload';
@@ -13,6 +14,7 @@ export const FinishedPage: React.FC = () => {
   const { searchQuery } = useUIStore();
   const { addToast } = useToastStore();
   const { startDownload } = useDownload();
+  const { t } = useI18n();
 
   // Filter finished items by search query
   const filteredItems = history.filter((item) => {
@@ -24,14 +26,14 @@ export const FinishedPage: React.FC = () => {
 
   const handlePlay = async (path: string) => {
     if (!path) {
-      addToast('error', 'No playable file was recorded for this download.');
+      addToast('error', t('finished.noPlayable'));
       return;
     }
     try {
       await invoke('open_file', { path });
     } catch (err) {
       console.error('Failed to play file:', err);
-      addToast('error', `Could not open file: ${String(err)}`);
+      addToast('error', t('finished.openFileFailed', { err: String(err) }));
     }
   };
 
@@ -47,14 +49,14 @@ export const FinishedPage: React.FC = () => {
   const handleOpenFolder = async (item: AnyDownloadItem) => {
     const path = revealPathFor(item);
     if (!path) {
-      addToast('error', 'No file location was recorded for this download.');
+      addToast('error', t('finished.noLocation'));
       return;
     }
     try {
       await invoke('open_folder', { path });
     } catch (err) {
       console.error('Failed to open enclosing folder:', err);
-      addToast('error', `Could not open folder: ${String(err)}`);
+      addToast('error', t('finished.openFolderFailed', { err: String(err) }));
     }
   };
 
@@ -77,7 +79,7 @@ export const FinishedPage: React.FC = () => {
       audioQuality: item.audioQuality,
     };
     void startDownload(item.url, options);
-    addToast('info', `Re-downloading${choice ? ` (${choice.label})` : ''}: ${item.title || item.url}`);
+    addToast('info', t('finished.redownloadToast', { quality: choice ? ` (${choice.label})` : '', title: item.title || item.url }));
   };
 
   return (
@@ -85,9 +87,9 @@ export const FinishedPage: React.FC = () => {
       {/* Header Row */}
       <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="flex-col">
-          <h1>Finished Downloads</h1>
+          <h1>{t('finished.title')}</h1>
           <p className="text-muted mt-sm" style={{ fontSize: '13px' }}>
-            {history.length} items downloaded successfully
+            {t('finished.summary', { n: history.length })}
           </p>
         </div>
 
@@ -97,11 +99,11 @@ export const FinishedPage: React.FC = () => {
             style={{ fontSize: '12px', padding: '6px 12px', height: '28px', color: 'var(--error)' }}
             onClick={() => {
               clearAll();
-              addToast('info', 'Download history cleared.');
+              addToast('info', t('finished.clearedToast'));
             }}
           >
             <span className="icon" style={{ fontSize: '16px' }}>delete_sweep</span>
-            Clear History
+            {t('finished.clear')}
           </button>
         )}
       </div>

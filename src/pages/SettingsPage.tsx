@@ -7,6 +7,7 @@ import Input from '../components/ui/Input';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useDownloadStore } from '../stores/downloadStore';
 import { useToastStore } from '../stores/toastStore';
+import { useI18n } from '../i18n';
 import { invoke } from '@tauri-apps/api/core';
 import { useTauriEvent } from '../hooks/useTauriEvent';
 import { getVersion } from '@tauri-apps/api/app';
@@ -14,6 +15,7 @@ import { getVersion } from '@tauri-apps/api/app';
 export const SettingsPage: React.FC = () => {
   const { settings, updateSetting, resetDefaults, isSaving } = useSettingsStore();
   const { addToast } = useToastStore();
+  const { t, language } = useI18n();
   // Tool updates are refused by the backend while downloads run.
   const hasActiveDownloads = useDownloadStore((s) =>
     s.downloads.some((d) => d.status === 'downloading' || d.status === 'merging')
@@ -70,11 +72,11 @@ export const SettingsPage: React.FC = () => {
     const targetPath = pathOverride || installerPath;
     if (!targetPath) return;
     try {
-      addToast('info', 'Launching update installer...');
+      addToast('info', t('settings.launchingInstaller'));
       await invoke('install_app_update', { filePath: targetPath });
     } catch (err) {
       console.error(err);
-      addToast('error', `Failed to execute installer: ${err}`);
+      addToast('error', t('settings.installerFailed', { err: String(err) }));
     }
   };
 
@@ -91,7 +93,7 @@ export const SettingsPage: React.FC = () => {
       handleInstallUpdate(payload.filePath);
     } else if (payload.status === 'error') {
       setUpdateStatus('error');
-      setErrorMsg(payload.message || 'Download failed');
+      setErrorMsg(payload.message || t('settings.downloadFailedFallback'));
     }
   });
 
@@ -142,21 +144,21 @@ export const SettingsPage: React.FC = () => {
 
   const handleUpdateTools = async () => {
     if (hasActiveDownloads) {
-      addToast('info', 'Pause or wait for running downloads before updating tools.');
+      addToast('info', t('settings.pauseBeforeTools'));
       return;
     }
     setToolsStatus('updating');
-    setToolsMsg('Starting tool update...');
+    setToolsMsg(t('settings.startingToolUpdate'));
     try {
       await invoke('update_tools');
       setToolsStatus('ready');
-      setToolsMsg('Download tools are up to date.');
-      addToast('success', 'Download tools updated successfully.');
+      setToolsMsg(t('settings.toolsUpToDate'));
+      addToast('success', t('settings.toolsUpdatedToast'));
     } catch (err) {
       console.error(err);
       setToolsStatus('error');
       setToolsMsg(String(err));
-      addToast('error', `Tool update failed: ${String(err)}`);
+      addToast('error', t('settings.toolsFailedToast', { err: String(err) }));
     }
   };
 
@@ -167,7 +169,7 @@ export const SettingsPage: React.FC = () => {
     } catch (err) {
       console.error(err);
       updateSetting('general', 'launchOnBoot', !enabled);
-      addToast('error', `Could not change startup setting: ${String(err)}`);
+      addToast('error', t('settings.startupFailed', { err: String(err) }));
     }
   };
 
@@ -202,7 +204,7 @@ export const SettingsPage: React.FC = () => {
       setCookieCheck({ status: 'idle', msg: '' });
       return;
     }
-    setCookieCheck({ status: 'checking', msg: 'Reading browser cookies…' });
+    setCookieCheck({ status: 'checking', msg: t('settings.readingCookies') });
     try {
       const res = await invoke<any>('check_cookies', {
         source: src,
@@ -211,7 +213,7 @@ export const SettingsPage: React.FC = () => {
       const domains = Array.isArray(res?.domains) ? res.domains.slice(0, 5).join(', ') : '';
       setCookieCheck({
         status: 'ok',
-        msg: `${res?.cookieCount ?? 0} cookies from ${res?.resolvedSource ?? src}${domains ? ` (${domains})` : ''}`,
+        msg: t('settings.cookiesFrom', { n: res?.cookieCount ?? 0, source: res?.resolvedSource ?? src }) + (domains ? ` (${domains})` : ''),
       });
     } catch (err) {
       console.error(err);
@@ -226,19 +228,19 @@ export const SettingsPage: React.FC = () => {
       {/* Header */}
       <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div className="flex-col">
-          <h1>Settings</h1>
-          <p className="text-muted mt-sm">Configure Deno backend engine, downloads storage directory, and interface preferences.</p>
+          <h1>{t('nav.settings')}</h1>
+          <p className="text-muted mt-sm">{t('settings.subtitle')}</p>
         </div>
         <div className="flex-row gap-xs text-muted" style={{ fontSize: '13px', alignItems: 'center', backgroundColor: 'var(--surface-container-low)', padding: '6px 14px', borderRadius: 'var(--radius-full)', border: '1px solid var(--outline-variant)' }}>
           {isSaving ? (
             <>
               <span className="icon text-primary-color" style={{ fontSize: '16px', animation: 'pulse 1s infinite ease-in-out' }}>sync</span>
-              <span style={{ fontWeight: 500 }}>Saving changes...</span>
+              <span style={{ fontWeight: 500 }}>{t('settings.saving')}</span>
             </>
           ) : (
             <>
               <span className="icon text-secondary-color" style={{ fontSize: '16px' }}>check_circle</span>
-              <span style={{ fontWeight: 500 }}>Settings auto-saved</span>
+              <span style={{ fontWeight: 500 }}>{t('settings.autoSaved')}</span>
             </>
           )}
         </div>
@@ -272,15 +274,15 @@ export const SettingsPage: React.FC = () => {
             />
             <h2 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="icon text-secondary-color">settings_suggest</span>
-              Deno Backend Engine
+              {t('settings.enginePanel')}
             </h2>
             
             <div className="flex-col gap-md">
               {/* Concurrent threads stepper */}
               <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <div className="flex-col" style={{ gap: '4px' }}>
-                  <span style={{ fontWeight: 500, fontSize: '13px' }}>Concurrent Downloads</span>
-                  <span className="text-muted" style={{ fontSize: '11px' }}>Maximum parallel video downloading threads.</span>
+                  <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.concurrentDownloads')}</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>{t('settings.maxThreadsDesc')}</span>
                 </div>
                 <NumberStepper 
                   value={settings.engine.concurrentThreads} 
@@ -295,8 +297,8 @@ export const SettingsPage: React.FC = () => {
               {/* Speed Limit */}
               <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <div className="flex-col" style={{ gap: '4px' }}>
-                  <span style={{ fontWeight: 500, fontSize: '13px' }}>Download Speed Limit</span>
-                  <span className="text-muted" style={{ fontSize: '11px' }}>Restrict maximum download bandwidth usage.</span>
+                  <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.speedLimit')}</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>{t('settings.speedLimitDesc')}</span>
                 </div>
                 <select
                   className="select-dark"
@@ -304,7 +306,7 @@ export const SettingsPage: React.FC = () => {
                   value={settings.engine.speedLimit || 0}
                   onChange={(e) => updateSetting('engine', 'speedLimit', Number(e.target.value))}
                 >
-                  <option value={0}>Unlimited</option>
+                  <option value={0}>{t("settings.unlimited")}</option>
                   <option value={512}>500 KB/s</option>
                   <option value={1024}>1 MB/s</option>
                   <option value={2048}>2 MB/s</option>
@@ -319,7 +321,7 @@ export const SettingsPage: React.FC = () => {
 
               {/* Proxy Type & Address */}
               <div className="flex-col gap-sm">
-                <span style={{ fontWeight: 500, fontSize: '13px' }}>Network Proxy Settings</span>
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.proxySettings')}</span>
                 <div className="flex-row gap-sm">
                   <select
                     className="select-dark"
@@ -330,7 +332,7 @@ export const SettingsPage: React.FC = () => {
                     <option value="SOCKS5">SOCKS5</option>
                   </select>
                   <Input
-                    placeholder="Proxy address (e.g. 127.0.0.1:1080)..."
+                    placeholder={t("settings.proxyPlaceholder")}
                     value={settings.engine.proxyAddress}
                     onChange={(e) => updateSetting('engine', 'proxyAddress', e.target.value)}
                     style={{ height: '38px', fontSize: '13px' }}
@@ -342,7 +344,7 @@ export const SettingsPage: React.FC = () => {
 
               {/* Cookie Settings */}
               <div className="flex-col gap-sm">
-                <span style={{ fontWeight: 500, fontSize: '13px' }}>Cookie Authentication (Stories &amp; Login-gated Content)</span>
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.cookieAuth')}</span>
                 <div className="flex-row gap-sm">
                   <select
                     className="select-dark"
@@ -356,8 +358,8 @@ export const SettingsPage: React.FC = () => {
                       handleVerifyCookies(v);
                     }}
                   >
-                    <option value="default">System Default Browser (Recommended)</option>
-                    <option value="none">No Cookies (None)</option>
+                    <option value="default">{t("settings.cookieDefault")}</option>
+                    <option value="none">{t("settings.cookieNone")}</option>
                     <option value="chrome">Google Chrome</option>
                     <option value="firefox">Mozilla Firefox</option>
                     <option value="edge">Microsoft Edge</option>
@@ -367,15 +369,15 @@ export const SettingsPage: React.FC = () => {
                     <option value="chromium">Chromium</option>
                     <option value="vivaldi">Vivaldi</option>
                     <option value="whale">Naver Whale</option>
-                    <option value="file">Use cookies.txt file</option>
+                    <option value="file">{t("settings.cookieFileOption")}</option>
                   </select>
                 </div>
                 {settings.engine.cookieSource === 'file' && (
                   <div className="flex-row gap-sm" style={{ marginTop: '4px' }}>
                     <Input
                       readOnly
-                      placeholder="Select cookies.txt file..."
-                      value={settings.engine.cookieFilePath || 'No cookie file selected'}
+                      placeholder={t("settings.cookiePlaceholder")}
+                      value={settings.engine.cookieFilePath || t('settings.noCookieFile')}
                       style={{ height: '38px', fontSize: '13px' }}
                     />
                     <Button variant="ghost" onClick={handleBrowseCookieFile} style={{ height: '38px' }}>
@@ -390,7 +392,7 @@ export const SettingsPage: React.FC = () => {
                       onClick={() => handleVerifyCookies()}
                       style={{ height: '32px', fontSize: '12px' }}
                     >
-                      {cookieCheck.status === 'checking' ? 'Checking…' : 'Verify Cookies'}
+                      {cookieCheck.status === 'checking' ? t('settings.checking') : t('settings.verifyCookies')}
                     </Button>
                     {cookieCheck.status === 'ok' && (
                       <span style={{ fontSize: '12px', color: '#6bd8cb' }}>✓ {cookieCheck.msg}</span>
@@ -404,9 +406,7 @@ export const SettingsPage: React.FC = () => {
                   </div>
                 )}
                 <span className="text-muted" style={{ fontSize: '11px', marginTop: '2px' }}>
-                  Facebook/Instagram/TikTok stories require authentication. System Default auto-detects
-                  your OS browser and falls back to other installed browsers when needed.
-                  Alternatively, export and upload a <code>cookies.txt</code> file.
+                  {t('settings.cookieHelp')}
                 </span>
               </div>
 
@@ -415,8 +415,8 @@ export const SettingsPage: React.FC = () => {
               {/* Auto update yt-dlp */}
               <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <div className="flex-col" style={{ gap: '4px' }}>
-                  <span style={{ fontWeight: 500, fontSize: '13px' }}>Auto-update yt-dlp</span>
-                  <span className="text-muted" style={{ fontSize: '11px' }}>Keep yt-dlp extractor up-to-date with latest changes.</span>
+                  <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.autoUpdateYtdlp')}</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>{t('settings.autoUpdateYtdlpDesc')}</span>
                 </div>
                 <Toggle 
                   checked={settings.engine.autoUpdateYtdlp}
@@ -430,18 +430,18 @@ export const SettingsPage: React.FC = () => {
               <div className="flex-col gap-sm">
                 <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                   <div className="flex-col" style={{ gap: '4px' }}>
-                    <span style={{ fontWeight: 500, fontSize: '13px' }}>Download Tools Version</span>
+                    <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.toolsVersion')}</span>
                     <span className="text-muted" style={{ fontSize: '11px' }}>
-                      {toolsStatus === 'idle' ? 'yt-dlp, FFmpeg, spotDL, gallery-dl, instaloader.' : toolsMsg}
+                      {toolsStatus === 'idle' ? t('settings.toolsIdle') : toolsMsg}
                     </span>
                   </div>
                   <Button
                     variant="ghost"
                     onClick={handleUpdateTools}
                     style={{ height: '38px', whiteSpace: 'nowrap' }}
-                    title={hasActiveDownloads ? 'Unavailable while downloads are running' : undefined}
+                    title={hasActiveDownloads ? t('settings.unavailableRunning') : undefined}
                   >
-                    {toolsStatus === 'updating' ? 'Updating…' : 'Update Tools Now'}
+                    {toolsStatus === 'updating' ? t('settings.updating') : t('settings.updateToolsNow')}
                   </Button>
                 </div>
                 {toolsStatus === 'updating' && (
@@ -455,18 +455,18 @@ export const SettingsPage: React.FC = () => {
           <GlassPanel>
             <h2 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="icon text-primary-color">folder</span>
-              Storage &amp; Save Path
+              {t('settings.storagePanel')}
             </h2>
 
             <div className="flex-col gap-md">
               {/* Save directory select field */}
               <div className="flex-col gap-sm">
-                <span style={{ fontWeight: 500, fontSize: '13px' }}>Default Downloads Directory</span>
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.defaultDir')}</span>
                 <div className="flex-row gap-sm">
                   <Input
                     readOnly
-                    placeholder="Select save path..."
-                    value={settings.storage.defaultDownloadPath || 'No directory selected'}
+                    placeholder={t("settings.dirPlaceholder")}
+                    value={settings.storage.defaultDownloadPath || t('settings.noDirSelected')}
                     style={{ height: '38px', fontSize: '13px' }}
                   />
                   <Button variant="ghost" onClick={handleBrowsePath} style={{ height: '38px' }}>
@@ -478,8 +478,8 @@ export const SettingsPage: React.FC = () => {
               {/* Create subfolders option */}
               <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <div className="flex-col" style={{ gap: '4px' }}>
-                  <span style={{ fontWeight: 500, fontSize: '13px' }}>Organize by Subfolders</span>
-                  <span className="text-muted" style={{ fontSize: '11px' }}>Save playlist videos inside dedicated folders.</span>
+                  <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.subfolders')}</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>{t('settings.subfoldersDesc')}</span>
                 </div>
                 <Toggle 
                   checked={settings.storage.createSubfolders}
@@ -498,38 +498,54 @@ export const SettingsPage: React.FC = () => {
           <GlassPanel style={{ height: '100%' }}>
             <h2 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="icon text-tertiary-color">palette</span>
-              General &amp; Themes
+              {t('settings.generalPanel')}
             </h2>
 
             <div className="flex-col gap-md">
               {/* Interface Theme buttons */}
               <div className="flex-col gap-sm">
-                <span style={{ fontWeight: 500, fontSize: '13px' }}>Interface Skin Theme</span>
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.skinTheme')}</span>
                 <div className="flex-row gap-sm">
                   <button
                     className={`btn btn-ghost ${settings.general.theme === 'deep-space' ? 'active' : ''}`}
                     style={{ flexGrow: 1, padding: '8px 0', fontSize: '12px' }}
                     onClick={() => updateSetting('general', 'theme', 'deep-space')}
                   >
-                    Deep Space
+                    {t('settings.deepSpace')}
                   </button>
                   <button
                     className={`btn btn-ghost ${settings.general.theme === 'system-sync' ? 'active' : ''}`}
                     style={{ flexGrow: 1, padding: '8px 0', fontSize: '12px' }}
                     onClick={() => updateSetting('general', 'theme', 'system-sync')}
                   >
-                    System Sync
+                    {t('settings.systemSync')}
                   </button>
                 </div>
               </div>
 
               <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
 
+                            {/* Language */}
+              <div style={{ height: '1px', backgroundColor: 'var(--outline-variant)', margin: '4px 0' }} />
+
+              <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.language')}</span>
+                <select
+                  className="select-dark"
+                  style={{ width: '150px' }}
+                  value={language}
+                  onChange={(e) => updateSetting('general', 'language', e.target.value as 'en' | 'vi')}
+                >
+                  <option value="en">English</option>
+                  <option value="vi">Tiếng Việt</option>
+                </select>
+              </div>
+
               {/* Launch on boot */}
               <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <div className="flex-col" style={{ gap: '4px' }}>
-                  <span style={{ fontWeight: 500, fontSize: '13px' }}>Launch on Boot</span>
-                  <span className="text-muted" style={{ fontSize: '11px' }}>Start VelocityDL automatically at login.</span>
+                  <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.launchOnBoot')}</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>{t('settings.launchOnBootDesc')}</span>
                 </div>
                 <Toggle
                   checked={settings.general.launchOnBoot}
@@ -542,8 +558,8 @@ export const SettingsPage: React.FC = () => {
               {/* Desktop notifications */}
               <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                 <div className="flex-col" style={{ gap: '4px' }}>
-                  <span style={{ fontWeight: 500, fontSize: '13px' }}>Desktop Notifications</span>
-                  <span className="text-muted" style={{ fontSize: '11px' }}>OS alerts when downloads finish or fail.</span>
+                  <span style={{ fontWeight: 500, fontSize: '13px' }}>{t('settings.notifications')}</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>{t('settings.notificationsDesc')}</span>
                 </div>
                 <Toggle
                   checked={settings.general.desktopNotifications}
@@ -557,12 +573,12 @@ export const SettingsPage: React.FC = () => {
           <GlassPanel>
             <h2 style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span className="icon text-secondary-color">system_update_alt</span>
-              App Update
+              {t('settings.appUpdate')}
             </h2>
 
             <div className="flex-col gap-md" style={{ fontSize: '13px' }}>
               <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 500 }}>Current Version</span>
+                <span style={{ fontWeight: 500 }}>{t("settings.currentVersion")}</span>
                 <span className="text-muted" style={{ fontWeight: 600 }}>v{currentVersion}</span>
               </div>
 
@@ -571,9 +587,9 @@ export const SettingsPage: React.FC = () => {
               {/* Status Rendering */}
               {updateStatus === 'idle' && (
                 <div className="flex-col gap-sm">
-                  <span className="text-muted" style={{ fontSize: '11px' }}>Check for the latest features and security updates.</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>{t('settings.checkHint')}</span>
                   <Button variant="primary" onClick={handleCheckUpdate} style={{ width: '100%' }}>
-                    Check for Updates
+                    {t('settings.checkForUpdates')}
                   </Button>
                 </div>
               )}
@@ -581,7 +597,7 @@ export const SettingsPage: React.FC = () => {
               {updateStatus === 'checking' && (
                 <div className="flex-col gap-sm" style={{ alignItems: 'center', padding: '12px 0' }}>
                   <span className="icon text-primary-color" style={{ fontSize: '24px', animation: 'pulse 1s infinite ease-in-out' }}>sync</span>
-                  <span style={{ fontSize: '12px' }} className="text-muted">Checking GitHub repository...</span>
+                  <span style={{ fontSize: '12px' }} className="text-muted">{t("settings.checkingGithub")}</span>
                 </div>
               )}
 
@@ -589,11 +605,11 @@ export const SettingsPage: React.FC = () => {
                 <div className="flex-col gap-sm">
                   <div className="flex-row gap-xs" style={{ alignItems: 'center', color: '#6bd8cb' }}>
                     <span className="icon" style={{ fontSize: '18px' }}>check_circle</span>
-                    <span style={{ fontWeight: 500 }}>Up to date</span>
+                    <span style={{ fontWeight: 500 }}>{t("settings.upToDate")}</span>
                   </div>
-                  <span className="text-muted" style={{ fontSize: '11px' }}>You are on the latest version of VelocityDL.</span>
+                  <span className="text-muted" style={{ fontSize: '11px' }}>{t('settings.onLatest')}</span>
                   <Button variant="ghost" onClick={handleCheckUpdate} style={{ width: '100%', marginTop: '4px' }}>
-                    Check Again
+                    {t('settings.checkAgain')}
                   </Button>
                 </div>
               )}
@@ -602,13 +618,13 @@ export const SettingsPage: React.FC = () => {
                 <div className="flex-col gap-sm">
                   <div className="flex-row gap-xs" style={{ alignItems: 'center', color: '#ffb95f' }}>
                     <span className="icon" style={{ fontSize: '18px' }}>info</span>
-                    <span style={{ fontWeight: 500 }}>New update v{updateInfo.latestVersion}</span>
+                    <span style={{ fontWeight: 500 }}>{t("settings.newUpdate", { ver: updateInfo.latestVersion })}</span>
                   </div>
 
                   {updateInfo.fileName && (
                     <div style={{ fontSize: '11px', color: 'var(--secondary-color)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                       <span className="icon" style={{ fontSize: '14px' }}>inventory_2</span>
-                      <span>Package: <strong>{updateInfo.fileName}</strong>{updateInfo.distroName ? ` (${updateInfo.distroName})` : ''}</span>
+                      <span>{t('settings.pkg')} <strong>{updateInfo.fileName}</strong>{updateInfo.distroName ? ` (${updateInfo.distroName})` : ''}</span>
                     </div>
                   )}
                   
@@ -627,11 +643,11 @@ export const SettingsPage: React.FC = () => {
                     }}
                     className="custom-scrollbar text-muted"
                   >
-                    {updateInfo.changelog || 'No release notes provided.'}
+                    {updateInfo.changelog || t('settings.noReleaseNotes')}
                   </div>
 
                   <Button variant="primary" onClick={handleDownloadUpdate} style={{ width: '100%', marginTop: '4px' }}>
-                    Download &amp; Auto-Install
+                    {t('settings.downloadAndInstall')}
                   </Button>
                 </div>
               )}
@@ -639,7 +655,7 @@ export const SettingsPage: React.FC = () => {
               {updateStatus === 'downloading' && (
                 <div className="flex-col gap-sm">
                   <div className="flex-row" style={{ justifyContent: 'space-between' }}>
-                    <span style={{ fontWeight: 500 }}>Downloading update...</span>
+                    <span style={{ fontWeight: 500 }}>{t("settings.downloadingUpdate")}</span>
                     <span>{downloadProgress}%</span>
                   </div>
                   <div style={{
@@ -663,13 +679,13 @@ export const SettingsPage: React.FC = () => {
                 <div className="flex-col gap-sm">
                   <div className="flex-row gap-xs" style={{ alignItems: 'center', color: '#6bd8cb' }}>
                     <span className="icon" style={{ fontSize: '18px' }}>download_done</span>
-                    <span style={{ fontWeight: 500 }}>Downloaded! Launching installer...</span>
+                    <span style={{ fontWeight: 500 }}>{t("settings.downloadedLaunching")}</span>
                   </div>
                   <span className="text-muted" style={{ fontSize: '11px' }}>
-                    The installer is launching automatically. Click below if you need to re-trigger.
+                    {t('settings.installerAuto')}
                   </span>
                   <Button variant="primary" onClick={() => handleInstallUpdate()} style={{ width: '100%', marginTop: '4px' }}>
-                    Restart &amp; Install Now
+                    {t('settings.restartInstall')}
                   </Button>
                 </div>
               )}
@@ -678,11 +694,11 @@ export const SettingsPage: React.FC = () => {
                 <div className="flex-col gap-sm">
                   <div className="flex-row gap-xs" style={{ alignItems: 'center', color: '#ffb4ab' }}>
                     <span className="icon" style={{ fontSize: '18px' }}>error</span>
-                    <span style={{ fontWeight: 500 }}>Update failed</span>
+                    <span style={{ fontWeight: 500 }}>{t("settings.updateFailed")}</span>
                   </div>
                   <span className="text-muted" style={{ fontSize: '11px', wordBreak: 'break-all' }}>{errorMsg}</span>
                   <Button variant="ghost" onClick={handleCheckUpdate} style={{ width: '100%', marginTop: '4px' }}>
-                    Retry Check
+                    {t('settings.retryCheck')}
                   </Button>
                 </div>
               )}
@@ -705,11 +721,11 @@ export const SettingsPage: React.FC = () => {
           className="btn btn-ghost" 
           onClick={() => {
             resetDefaults();
-            addToast('success', 'Settings reset to defaults');
+            addToast('success', t('settings.resetToast'));
           }}
           style={{ height: '38px', padding: '0 20px' }}
         >
-          Reset Defaults
+          {t('settings.resetDefaults')}
         </button>
       </div>
     </div>

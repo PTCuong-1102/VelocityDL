@@ -6,6 +6,7 @@ import { Platform, PlaylistItem, isPlaylistItem, generateDownloadId } from '../t
 import useToastStore from '../stores/toastStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useHistoryStore } from '../stores/historyStore';
+import { useI18n } from '../i18n';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 
 /**
@@ -81,6 +82,7 @@ export function useDownload() {
     cancelDownload: storeCancel 
   } = useDownloadStore();
   const { addToast } = useToastStore();
+  const { t } = useI18n();
 
   // Listen for real-time progress events from Tauri
   useTauriEvent<any>('info-progress', (event) => {
@@ -120,7 +122,7 @@ export function useDownload() {
         for (let i = beforeCompleted; i < afterCompleted; i++) {
           const child = beforeItem.children?.[i];
           const childTitle = child?.title || `Video #${i + 1}`;
-          addToast('success', `✓ Completed: ${childTitle}`);
+          addToast('success', t('toast.completed', { title: childTitle }));
         }
       }
     }
@@ -144,22 +146,22 @@ export function useDownload() {
             for (let i = beforeCompleted; i < totalItems; i++) {
               const child = item.children?.[i];
               const childTitle = child?.title || `Video #${i + 1}`;
-              addToast('success', `✓ Completed: ${childTitle}`);
+              addToast('success', t('toast.completed', { title: childTitle }));
             }
           }
-          addToast('success', `✓ Playlist download completed: ${item.title}`);
-          notifyDesktop('VelocityDL', `Playlist download completed: ${item.title}`);
+          addToast('success', t('toast.playlistCompleted', { title: item.title }));
+          notifyDesktop(t('toast.playlistNotifTitle'), t('toast.playlistNotifBody', { title: item.title }));
         } else {
           const title = item.title || 'Download';
-          addToast('success', `✓ Completed: ${title}`);
-          notifyDesktop('VelocityDL — download finished', title);
+          addToast('success', t('toast.completed', { title }));
+          notifyDesktop(t('toast.downloadFinishedTitle'), title);
         }
       }
     }
     // Show error toast when a download fails
     if (payload.status === 'error' && payload.error) {
-      addToast('error', `Download failed: ${payload.error}`);
-      notifyDesktop('VelocityDL — download failed', String(payload.error).substring(0, 200));
+      addToast('error', t('toast.downloadFailed', { error: payload.error }));
+      notifyDesktop(t('toast.downloadFailedNotifTitle'), String(payload.error).substring(0, 200));
     }
   });
 
@@ -172,7 +174,7 @@ export function useDownload() {
          d.status === 'downloading' || d.status === 'merging' || d.status === 'paused')
     );
     if (dupe) {
-      addToast('info', 'This URL is already in your queue.');
+      addToast('info', t('toast.alreadyQueued'));
       return;
     }
 
@@ -256,12 +258,12 @@ export function useDownload() {
     }
 
     if (prefetchedInfo) {
-      addToast('info', `Starting download: ${prefetchedInfo.title || url}`);
+      addToast('info', t('toast.starting', { title: prefetchedInfo.title || url }));
       // Item is already marked as 'queued'. Queue Manager will pick it up.
       return;
     }
 
-    addToast('info', 'Fetching video information...');
+    addToast('info', t('toast.fetchingInfo'));
 
     try {
       // Respect the parallel-analysis cap before probing the backend.
@@ -285,7 +287,7 @@ export function useDownload() {
         )
       }));
 
-      addToast('info', `Starting download: ${info.title || url}`);
+      addToast('info', t('toast.starting', { title: info.title || url }));
 
       // 2. Mark as queued so Queue Manager can pick it up
       useDownloadStore.setState((state) => ({
@@ -294,7 +296,7 @@ export function useDownload() {
         )
       }));
     } catch (err) {
-      addToast('error', `Failed to fetch URL info: ${String(err)}`);
+      addToast('error', t('toast.infoFetchFailed', { err: String(err) }));
       updateProgress({
         id,
         progress: 0,
@@ -379,7 +381,7 @@ export function useDownload() {
           : d
       )
     }));
-    addToast('info', 'Retrying download...');
+    addToast('info', t('toast.retrying'));
   };
 
   const removeDownloadItem = async (id: string) => {

@@ -13,7 +13,7 @@ const DEFAULTS: AppSettings = {
     speedLimit: 0,
   },
   storage: { defaultDownloadPath: '', createSubfolders: false },
-  general: { theme: 'deep-space', launchOnBoot: false, desktopNotifications: true },
+  general: { theme: 'deep-space', launchOnBoot: false, desktopNotifications: true, language: 'en' },
 };
 
 describe('mergeWithDefaults (settings upgrade crash guard)', () => {

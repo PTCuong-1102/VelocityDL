@@ -16,5 +16,7 @@ export interface AppSettings {
     theme: 'deep-space' | 'system-sync';
     launchOnBoot: boolean;
     desktopNotifications: boolean;
+    /** UI language — 'en' English, 'vi' Vietnamese. */
+    language: 'en' | 'vi';
   };
 }

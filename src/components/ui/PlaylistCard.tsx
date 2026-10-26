@@ -4,6 +4,7 @@ import { ProgressBar } from './ProgressBar';
 import { StatusDot } from './StatusDot';
 import { formatSpeed } from '../../utils/format';
 import { getPlatformColor } from '../../utils/platform';
+import { useI18n } from '../../i18n';
 import PlatformIcon from '../shared/PlatformIcon';
 
 interface PlaylistCardProps {
@@ -23,7 +24,8 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
   onRetry,
   onRemove
 }) => {
-  const [expanded, setExpanded] = useState(false);
+
+  const { t } = useI18n();  const [expanded, setExpanded] = useState(false);
 
   const isDownloading = item.status === 'downloading';
   const isPaused = item.status === 'paused';
@@ -79,7 +81,7 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
               fontWeight: 600
             }}
           >
-            {item.totalItems} videos
+            {t('ui.playlistShort', { n: item.totalItems })}
           </div>
         </div>
 
@@ -102,7 +104,7 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
           <div className="flex-row" style={{ fontSize: '11px', color: 'var(--on-surface-variant)', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="flex-row" style={{ alignItems: 'center', gap: '6px' }}>
               <StatusDot status={item.status} />
-              <span>{item.completedItems} / {item.totalItems} completed</span>
+              <span>{t('card.completedCount', { a: item.completedItems, b: item.totalItems })}</span>
             </div>
             <span className="mono" style={{ fontWeight: 600, color: 'var(--primary)' }}>
               {item.progress.toFixed(1)}%
@@ -154,7 +156,7 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
               className="btn btn-ghost btn-icon flex-center"
               style={{ width: '32px', height: '32px', color: 'var(--secondary)' }}
               onClick={() => onRetry(item.id)}
-              title="Retry download"
+              title={t('card.retryTitle')}
             >
               <span className="icon">refresh</span>
             </button>
@@ -165,7 +167,7 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
               className="btn btn-ghost btn-icon flex-center"
               style={{ width: '32px', height: '32px', color: 'var(--secondary)' }}
               onClick={() => onRetry(item.id)}
-              title="Retry download"
+              title={t('card.retryTitle')}
             >
               <span className="icon">refresh</span>
             </button>
@@ -176,7 +178,7 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
               className="btn btn-ghost btn-icon flex-center"
               style={{ width: '32px', height: '32px', color: 'var(--on-surface-variant)' }}
               onClick={() => onRemove(item.id)}
-              title="Remove from queue"
+              title={t('card.removeFromQueue')}
             >
               <span className="icon">delete</span>
             </button>

@@ -5,6 +5,7 @@ import { StatusDot } from './StatusDot';
 import { formatBytes, formatSpeed, formatETA } from '../../utils/format';
 import { getPlatformColor } from '../../utils/platform';
 import PlatformIcon from '../shared/PlatformIcon';
+import { useI18n } from '../../i18n';
 import ConfirmDialog from './ConfirmDialog';
 
 interface DownloadCardProps {
@@ -24,6 +25,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
   onRetry,
   onRemove
 }) => {
+  const { t } = useI18n();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const isDownloading = item.status === 'downloading';
   const isMerging = item.status === 'merging';
@@ -204,23 +206,23 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
           }}
         >
           {isError ? (
-            <span style={{ color: 'var(--error)' }}>Error: {item.error || 'Unknown failure'}</span>
+            <span style={{ color: 'var(--error)' }}>Error: {item.error || t('card.unknownFailure')}</span>
           ) : isCancelled ? (
-            <span>Cancelled — partial files were deleted. Use ↻ to retry.</span>
+            <span>{t('card.cancelledHint')}</span>
           ) : isMerging ? (
             <span style={{ color: 'var(--warning, #ffb74d)', fontWeight: 500 }}>
               <span className="icon" style={{ fontSize: '11px', verticalAlign: 'middle', marginRight: '4px' }}>
                 {isAudio ? 'audio_file' : 'sync'}
               </span>
               {isAudio 
-                ? 'FFmpeg is converting audio format to MP3...' 
-                : 'FFmpeg is merging video and audio tracks into a single file...'}
+                ? t('card.ffmpegAudio') 
+                : t('card.ffmpegMerge')}
             </span>
           ) : (
             <>
               {/* Bytes Downloaded / Total */}
               <span>
-                {formatBytes(item.downloadedBytes)} / {item.totalBytes > 0 ? formatBytes(item.totalBytes) : 'Unknown size'}
+                {formatBytes(item.downloadedBytes)} / {item.totalBytes > 0 ? formatBytes(item.totalBytes) : t('common.unknownSize')}
               </span>
 
               {/* Download Speed */}
@@ -232,7 +234,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
 
               {/* Time Remaining */}
               <span>
-                {isDownloading ? `${formatETA(item.eta)} left` : isQueued ? 'Waiting in queue' : isPaused ? 'Paused' : ''}
+                {isDownloading ? t('card.etaLeft', { eta: formatETA(item.eta) }) : isQueued ? t('card.waitingInQueue') : isPaused ? t('card.paused') : ''}
               </span>
             </>
           )}
@@ -266,7 +268,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
             className="btn btn-ghost btn-icon flex-center"
             style={{ width: '32px', height: '32px', color: 'var(--error)' }}
             onClick={() => setShowCancelConfirm(true)}
-            title={isAnalyzing ? 'Remove this item' : 'Cancel download'}
+            title={isAnalyzing ? t('card.removeItemTitle') : t('card.cancelDownloadTitle')}
           >
             <span className="icon">close</span>
           </button>
@@ -277,7 +279,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
             className="btn btn-ghost btn-icon flex-center"
             style={{ width: '32px', height: '32px', color: 'var(--secondary)' }}
             onClick={() => onRetry(item.id)}
-            title="Retry download"
+            title={t('card.retryTitle')}
           >
             <span className="icon">refresh</span>
           </button>
@@ -288,7 +290,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
             className="btn btn-ghost btn-icon flex-center"
             style={{ width: '32px', height: '32px', color: 'var(--secondary)' }}
             onClick={() => onRetry(item.id)}
-            title="Retry download"
+            title={t('card.retryTitle')}
           >
             <span className="icon">refresh</span>
           </button>
@@ -299,7 +301,7 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
             className="btn btn-ghost btn-icon flex-center"
             style={{ width: '32px', height: '32px', color: 'var(--on-surface-variant)' }}
             onClick={() => onRemove(item.id)}
-            title="Remove from queue"
+            title={t('card.removeFromQueue')}
           >
             <span className="icon">delete</span>
           </button>
@@ -309,10 +311,10 @@ export const DownloadCard: React.FC<DownloadCardProps> = ({
       {/* Cancel Confirmation Dialog */}
       <ConfirmDialog
         open={showCancelConfirm}
-        title="Cancel Download?"
-        message={`Are you sure you want to cancel downloading "${item.title || 'this file'}"? Partial files will be deleted.`}
-        confirmLabel="Cancel Download"
-        cancelLabel="Keep Downloading"
+        title={t('card.cancelTitle')}
+        message={t('card.cancelMessage', { title: item.title || t('card.thisFile') })}
+        confirmLabel={t('card.cancelDownload')}
+        cancelLabel={t('card.keepDownloading')}
         variant="danger"
         onConfirm={() => {
           setShowCancelConfirm(false);

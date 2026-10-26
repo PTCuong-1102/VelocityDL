@@ -5,6 +5,7 @@ import Button from '../ui/Button';
 import Toggle from '../ui/Toggle';
 import { useUIStore } from '../../stores/uiStore';
 import PlatformIcon from './PlatformIcon';
+import { useI18n } from '../../i18n';
 
 interface URLInputProps {
   onDownload: (url: string, options: DownloadOptions, prefetchedInfo?: any) => void;
@@ -44,6 +45,7 @@ export interface AnalyzedMetadata {
 }
 
 export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
+  const { t } = useI18n();
   const {
     urlInputUrl: url,
     setUrlInputUrl: setUrl,
@@ -93,7 +95,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
       const info = await invoke<AnalyzedMetadata>('get_video_info', { url: trimmedUrl });
       
       if (!info) {
-        throw new Error('Failed to retrieve video information.');
+        throw new Error(t('ui.infoFailed'));
       }
       
       setAnalyzedInfo(info);
@@ -130,7 +132,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
       .filter((u) => u.startsWith('http://') || u.startsWith('https://'));
 
     if (urls.length === 0) {
-      setError('Please enter at least one valid video URL starting with http:// or https://');
+      setError(t('ui.needUrlErr'));
       return;
     }
 
@@ -160,7 +162,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
   };
 
   const getPlatformName = (platform: string) => {
-    if (platform === 'other') return 'Direct Link';
+    if (platform === 'other') return t('ui.directLink');
     return platform.charAt(0).toUpperCase() + platform.slice(1);
   };
 
@@ -215,7 +217,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                 setError(null);
               }}
             >
-              Single URL
+              {t('ui.singleUrl')}
             </button>
             <button
               className={`btn btn-ghost ${isBatchMode ? 'active' : ''}`}
@@ -233,7 +235,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                 setError(null);
               }}
             >
-              Batch URLs
+              {t('ui.batchUrls')}
             </button>
           </div>
 
@@ -272,14 +274,14 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   }}
                 >
                   <span className="icon text-primary-color" style={{ fontSize: '24px' }}>file_download</span>
-                  <span style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px' }}>Drop URL here</span>
+                  <span style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px' }}>{t('ui.dropUrlHere')}</span>
                 </div>
               )}
               <div style={{ flexGrow: 1 }}>
                 <Input
                   icon="link"
                   mono
-                  placeholder="Paste your video, audio, or playlist URL here..."
+                  placeholder={t('ui.pasteUrl')}
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   onKeyDown={(e) => {
@@ -312,7 +314,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                 onClick={handleAnalyze}
                 disabled={!url.trim() || isAnalyzing}
               >
-                {isAnalyzing ? 'Analyzing...' : 'Analyze Link'}
+                {isAnalyzing ? t('ui.analyzing') : t('ui.analyze')}
               </Button>
             </div>
           ) : (
@@ -359,7 +361,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                     }}
                   >
                     <span className="icon text-primary-color" style={{ fontSize: '24px' }}>file_download</span>
-                    <span style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px' }}>Drop text file or links here</span>
+                    <span style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '14px' }}>{t('ui.dropListHere')}</span>
                   </div>
                 )}
                 
@@ -398,7 +400,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                     }}
                   >
                     <span className="icon" style={{ fontSize: '14px' }}>attach_file</span>
-                    Import from .txt
+                    {t('ui.importTxt')}
                     <input 
                       type="file" 
                       accept=".txt" 
@@ -421,7 +423,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   </label>
                   
                   <span className="text-muted" style={{ fontSize: '11px' }}>
-                    {batchUrls.split('\n').filter(l => l.trim().startsWith('http')).length} valid URLs
+                    {t('ui.validUrls', { n: batchUrls.split('\n').filter(l => l.trim().startsWith('http')).length })}
                   </span>
                 </div>
               </div>
@@ -448,7 +450,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   {/* Format Mode Option */}
                   <div className="flex-col gap-sm">
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>
-                      Download Format Mode
+                      {t('ui.formatMode')}
                     </span>
                     <div className="flex-row gap-sm">
                       <button
@@ -465,15 +467,15 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                         onClick={() => setDownloadMode('audio')}
                       >
                         <span className="icon">music_note</span>
-                        Audio (MP3)
+                        {t('ui.audioMp3')}
                       </button>
                     </div>
                   </div>
 
-                  {/* Quality Settings */}
+                  {/* {t('ui.qualitySettings')} */}
                   <div className="flex-col gap-sm">
                     <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>
-                      Quality Settings
+                      {t('ui.qualitySettings')}
                     </span>
                     {downloadMode === 'video' ? (
                       <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
@@ -563,7 +565,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                     }}
                   >
                     <Toggle 
-                      label="Extract & Download Subtitles (if available)" 
+                      label="{t('ui.extractSubs')}" 
                       checked={extractSubs}
                       onChange={(e) => setExtractSubs(e.target.checked)}
                     />
@@ -589,7 +591,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                       setError(null);
                     }}
                   >
-                    Clear List
+                    {t('ui.clearList')}
                   </Button>
                   <Button 
                     variant="primary" 
@@ -598,7 +600,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                     onClick={handleStartBatchDownload}
                     disabled={!batchUrls.trim()}
                   >
-                    Download Batch ({batchUrls.split('\n').filter(l => l.trim().startsWith('http')).length})
+                    Download Batch ({t('ui.downloadBatch', { n: batchUrls.split('\n').filter(l => l.trim().startsWith('http')).length })})
                   </Button>
                 </div>
               </div>
@@ -651,7 +653,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
             >
               <span className="icon text-tertiary-color" style={{ color: 'var(--error)', fontSize: '24px' }}>error_outline</span>
               <div className="flex-col" style={{ flexGrow: 1, gap: '4px' }}>
-                <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--error)' }}>Analysis Failed</span>
+                <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--error)' }}>{t('ui.analysisFailed')}</span>
                 <span className="text-muted" style={{ fontSize: '13px', lineHeight: 1.4 }}>{error}</span>
               </div>
               <button 
@@ -692,8 +694,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
             >
               <span className="icon" style={{ fontSize: '18px', color: 'var(--tertiary, #ffb95f)' }}>lock</span>
               <span>
-                This link needs {getPlatformName(analyzedInfo.platform)} login cookies. Set <strong>Cookie Authentication</strong> in
-                Settings first, otherwise the download will fail.
+                {t('ui.cookieWarn', { platform: getPlatformName(analyzedInfo.platform) })}
               </span>
             </div>
           )}
@@ -801,7 +802,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                     }}
                   >
                     <span className="icon" style={{ fontSize: '12px' }}>playlist_play</span>
-                    <span>Playlist ({analyzedInfo.totalItems} videos)</span>
+                    <span>{t('ui.playlistBadge', { n: analyzedInfo.totalItems ?? 0 })}</span>
                   </div>
                 )}
 
@@ -856,7 +857,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                 {/* Uploader name */}
                 {analyzedInfo.uploader && (
                   <span className="text-muted" style={{ fontSize: '13px' }}>
-                    uploader: <strong style={{ color: 'var(--on-surface-variant)' }}>{analyzedInfo.uploader}</strong>
+                    {t('ui.uploader')} <strong style={{ color: 'var(--on-surface-variant)' }}>{analyzedInfo.uploader}</strong>
                   </span>
                 )}
               </div>
@@ -874,7 +875,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
             {/* Download Mode Option */}
             <div className="flex-col gap-sm">
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>
-                Download Format Mode
+                {t('ui.formatMode')}
               </span>
               <div className="flex-row gap-sm">
                 <button
@@ -883,7 +884,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   onClick={() => setDownloadMode('video')}
                 >
                   <span className="icon">movie</span>
-                  Video
+                  {t('ui.video')}
                 </button>
                 <button
                   className={`btn ${downloadMode === 'audio' ? 'btn-primary' : 'btn-ghost'}`}
@@ -891,7 +892,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   onClick={() => setDownloadMode('audio')}
                 >
                   <span className="icon">music_note</span>
-                  Audio Only (MP3)
+                  {t('ui.audioOnlyMp3')}
                 </button>
               </div>
             </div>
@@ -899,7 +900,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
             {/* Sub-options for Selected Mode */}
             <div className="flex-col gap-sm">
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>
-                Quality settings
+                {t('ui.qualitySettings')}
               </span>
               
               {downloadMode === 'video' ? (
@@ -962,7 +963,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                 <div className="flex-col gap-sm" style={{ width: '100%' }}>
                   {/* Format selection */}
                   <div className="flex-col" style={{ gap: '6px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--on-surface-variant)' }}>Format</span>
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--on-surface-variant)' }}>{t('ui.format')}</span>
                     <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
                       {['mp3', 'm4a', 'wav', 'flac', 'opus'].map((fmt) => (
                         <button
@@ -986,7 +987,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   </div>
                   {/* Quality/Bitrate selection */}
                   <div className="flex-col" style={{ gap: '6px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--on-surface-variant)' }}>Quality / Bitrate</span>
+                    <span style={{ fontSize: '12px', fontWeight: 500, color: 'var(--on-surface-variant)' }}>{t('ui.qualityBitrate')}</span>
                     <div className="flex-row gap-xs" style={{ flexWrap: 'wrap' }}>
                       {[
                         { value: '320k', label: '320k (Best)' },
@@ -1031,11 +1032,11 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
               >
                 <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--on-surface-variant)' }}>
-                    Subtitles / Phụ đề
+                    {t('ui.subtitles')}
                   </span>
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                     <Toggle 
-                      label="Embed into video (Gộp vào video)" 
+                      label={t('ui.embedSubs')} 
                       checked={embedSubs}
                       onChange={(e) => setEmbedSubs(e.target.checked)}
                     />
@@ -1073,7 +1074,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
 
                 {selectedSubtitles.length > 0 && (
                   <div style={{ fontSize: '11px', color: 'var(--primary)', marginTop: '4px' }}>
-                    Selected {selectedSubtitles.length} subtitle language(s) to download {embedSubs ? 'and embed into the video' : ''}.
+                    {t('ui.selectedSubs', { n: selectedSubtitles.length, andEmbed: embedSubs ? t('ui.andEmbed') : '' })}
                   </div>
                 )}
               </div>
@@ -1088,7 +1089,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   }}
                 >
                   <Toggle 
-                    label="Extract & Download Subtitles (if available)" 
+                    label="{t('ui.extractSubs')}" 
                     checked={extractSubs}
                     onChange={(e) => setExtractSubs(e.target.checked)}
                   />
@@ -1114,7 +1115,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
               style={{ height: '42px', padding: '0 20px' }}
               onClick={handleReset}
             >
-              Reset
+              {t('ui.reset')}
             </Button>
             <Button 
               variant="primary" 
@@ -1122,7 +1123,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
               style={{ height: '42px', padding: '0 28px', fontWeight: 600 }}
               onClick={handleStartDownload}
             >
-              Start Download
+              {t('ui.startDownload')}
             </Button>
           </div>
         </div>

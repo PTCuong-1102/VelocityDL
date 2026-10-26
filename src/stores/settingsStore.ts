@@ -32,6 +32,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     theme: 'deep-space',
     launchOnBoot: false,
     desktopNotifications: true,
+    language: 'en',
   },
 };
 

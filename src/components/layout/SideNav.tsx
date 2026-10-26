@@ -2,21 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useUIStore } from '../../stores/uiStore';
 import { getVersion } from '@tauri-apps/api/app';
+import { useI18n } from '../../i18n';
 
 export const SideNav: React.FC = () => {
   const { sidebarCollapsed, toggleSidebar, resetUrlInput } = useUIStore();
   const navigate = useNavigate();
   const [appVersion, setAppVersion] = useState('0.0.0');
+  const { t } = useI18n();
 
   useEffect(() => {
     getVersion().then(setAppVersion).catch(() => setAppVersion('0.0.0'));
   }, []);
 
   const menuItems = [
-    { path: '/', label: 'Dashboard', icon: 'dashboard' },
-    { path: '/queue', label: 'Download Queue', icon: 'download' },
-    { path: '/finished', label: 'Finished', icon: 'check_circle' },
-    { path: '/settings', label: 'Settings', icon: 'settings' },
+    { path: '/', label: t('nav.dashboard'), icon: 'dashboard' },
+    { path: '/queue', label: t('nav.queue'), icon: 'download' },
+    { path: '/finished', label: t('nav.finished'), icon: 'check_circle' },
+    { path: '/settings', label: t('nav.settings'), icon: 'settings' },
   ];
 
   return (
@@ -77,7 +79,7 @@ export const SideNav: React.FC = () => {
           }}
         >
           <span className="icon">add</span>
-          {!sidebarCollapsed && <span>Add URL</span>}
+          {!sidebarCollapsed && <span>{t('nav.addUrl')}</span>}
         </button>
       </div>
 

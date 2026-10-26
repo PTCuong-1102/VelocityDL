@@ -4,12 +4,14 @@ import PlaylistCard from '../components/ui/PlaylistCard';
 import { useDownloadStore } from '../stores/downloadStore';
 import { useUIStore } from '../stores/uiStore';
 import { useDownload } from '../hooks/useDownload';
+import { useI18n } from '../i18n';
 import { isPlaylistItem } from '../types/download';
 
 export const QueuePage: React.FC = () => {
   const { downloads } = useDownloadStore();
   const { pauseDownload, resumeDownload, cancelDownload, retryDownload, removeDownloadItem } = useDownload();
   const { searchQuery } = useUIStore();
+  const { t } = useI18n();
 
   // Filter out completed/finished downloads
   const queueItems = downloads.filter((d) => d.status !== 'finished');
@@ -55,9 +57,9 @@ export const QueuePage: React.FC = () => {
         }}
       >
         <div className="flex-col">
-          <h1>Download Queue</h1>
+          <h1>{t('nav.queue')}</h1>
           <p className="text-muted mt-sm" style={{ fontSize: '13px' }}>
-            {activeCount} downloading • {pausedCount} paused • {queuedCount} queued
+            {t('queue.summary', { active: activeCount, paused: pausedCount, queued: queuedCount })}
           </p>
         </div>
 
@@ -70,7 +72,7 @@ export const QueuePage: React.FC = () => {
                 onClick={handlePauseAll}
               >
                 <span className="icon" style={{ fontSize: '16px' }}>pause</span>
-                Pause All
+                {t('queue.pauseAll')}
               </button>
             )}
             {pausedCount > 0 && (
@@ -80,7 +82,7 @@ export const QueuePage: React.FC = () => {
                 onClick={handleResumeAll}
               >
                 <span className="icon" style={{ fontSize: '16px' }}>play_arrow</span>
-                Resume All
+                {t('queue.resumeAll')}
               </button>
             )}
           </div>
@@ -129,10 +131,10 @@ export const QueuePage: React.FC = () => {
             </span>
             <div className="flex-col" style={{ alignItems: 'center', gap: '4px' }}>
               <h3 style={{ fontSize: '15px', color: 'var(--on-surface-variant)' }}>
-                {searchQuery ? 'No matching downloads' : 'Your queue is empty'}
+                {searchQuery ? t('queue.noMatchTitle') : t('queue.emptyTitle')}
               </h3>
               <p className="text-muted" style={{ fontSize: '12px' }}>
-                {searchQuery ? 'Try adjusting your search terms.' : 'Downloads you start will appear here.'}
+                {searchQuery ? t('queue.noMatchDesc') : t('queue.emptyDesc')}
               </p>
             </div>
           </div>

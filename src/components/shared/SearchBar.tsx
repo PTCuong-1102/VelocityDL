@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useUIStore } from '../../stores/uiStore';
+import { useI18n } from '../../i18n';
 
 export const SearchBar: React.FC = () => {
   const location = useLocation();
   const { searchQuery, setSearchQuery } = useUIStore();
+  const { t } = useI18n();
 
   // Don't leak a filter from one page into another.
   useEffect(() => {
@@ -14,13 +16,13 @@ export const SearchBar: React.FC = () => {
   const getPlaceholder = () => {
     switch (location.pathname) {
       case '/queue':
-        return 'Search queue...';
+        return t('search.queue');
       case '/finished':
-        return 'Search finished downloads...';
+        return t('search.finished');
       case '/settings':
-        return 'Search settings...';
+        return t('search.settings');
       default:
-        return 'Search here...';
+        return t('search.here');
     }
   };
 
