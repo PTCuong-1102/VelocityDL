@@ -716,6 +716,23 @@ async function installInstaloaderViaPip(): Promise<void> {
       lastErr = err instanceof Error ? err.message : String(err);
     }
   }
+  // PEP 668 (Ubuntu 23.04+ / python3.12+): `pip install` is refused unless
+  // --break-system-packages is passed. Re-run the main candidate with the
+  // flag instead of failing the whole tool setup.
+  if (/externally[- ]managed/i.test(lastErr)) {
+    try {
+      const cmd = new Deno.Command("python3", {
+        args: ["-m", "pip", "install", "--user", "--break-system-packages", "instaloader"],
+        stdout: "piped",
+        stderr: "piped",
+      });
+      const out = await cmd.output();
+      if (out.success) return;
+      lastErr = new TextDecoder().decode(out.stderr).slice(-2000);
+    } catch (err) {
+      lastErr = err instanceof Error ? err.message : String(err);
+    }
+  }
   throw new Error(`pip install instaloader failed: ${lastErr}`);
 }
 
