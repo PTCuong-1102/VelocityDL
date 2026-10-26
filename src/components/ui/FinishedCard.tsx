@@ -8,12 +8,18 @@ interface FinishedCardProps {
   item: AnyDownloadItem;
   onPlay?: (path: string) => void;
   onOpenFolder?: (item: AnyDownloadItem) => void;
+  /** Re-run this entry with its original options (History v2). */
+  onRedownload?: (item: AnyDownloadItem) => void;
+  /** Remove this entry from the persistent history. */
+  onRemove?: (id: string) => void;
 }
 
 export const FinishedCard: React.FC<FinishedCardProps> = ({
   item,
   onPlay,
-  onOpenFolder
+  onOpenFolder,
+  onRedownload,
+  onRemove
 }) => {
   const platformColor = getPlatformColor(item.platform);
   // Play needs a real file; a playlist parent outputPath is a directory.
@@ -206,6 +212,35 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
               title="Open enclosing folder"
             >
               <span className="icon" style={{ fontSize: '16px' }}>folder_open</span>
+            </button>
+          )}
+
+          {onRedownload && (
+            <button
+              className="btn btn-ghost btn-icon flex-center"
+              style={{
+                width: '28px',
+                height: '28px'
+              }}
+              onClick={() => onRedownload(item)}
+              title="Download again with the original options"
+            >
+              <span className="icon" style={{ fontSize: '16px' }}>refresh</span>
+            </button>
+          )}
+
+          {onRemove && (
+            <button
+              className="btn btn-ghost btn-icon flex-center"
+              style={{
+                width: '28px',
+                height: '28px',
+                color: 'var(--error)'
+              }}
+              onClick={() => onRemove(item.id)}
+              title="Remove from history"
+            >
+              <span className="icon" style={{ fontSize: '16px' }}>delete</span>
             </button>
           )}
         </div>

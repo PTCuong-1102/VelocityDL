@@ -6,6 +6,7 @@ import QueuePage from './pages/QueuePage';
 import FinishedPage from './pages/FinishedPage';
 import SettingsPage from './pages/SettingsPage';
 import useSettingsStore from './stores/settingsStore';
+import useHistoryStore from './stores/historyStore';
 import { invoke } from '@tauri-apps/api/core';
 
 export const App: React.FC = () => {
@@ -38,6 +39,9 @@ export const App: React.FC = () => {
     };
 
     loadSettings();
+
+    // Load the persisted download history from the backend file.
+    void useHistoryStore.getState().loadHistory();
 
     // Ask once for desktop-notification permission (honored per-download).
     try {

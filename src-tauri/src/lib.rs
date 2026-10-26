@@ -16,11 +16,13 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        // Real OS notifications (Windows toasts / GSettings on Linux) — the
+        // Web Notification API is unreliable on Linux WebKitGTK builds.
+        .plugin(tauri_plugin_notification::init())
         // Register Commands
         .invoke_handler(tauri::generate_handler![
             commands::download::start_download,
@@ -40,8 +42,9 @@ pub fn run() {
             commands::update::check_app_update,
             commands::update::start_app_update_download,
             commands::update::update_tools,
-            commands::update::exit_app,
             commands::update::install_app_update,
+            commands::history::load_history,
+            commands::history::save_history,
         ])
         // Kill all active downloads when the window is closed
         .on_window_event(|window, event| {

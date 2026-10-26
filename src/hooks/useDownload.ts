@@ -5,18 +5,70 @@ import { DownloadOptions } from '../components/shared/URLInput';
 import { Platform, PlaylistItem, isPlaylistItem, generateDownloadId } from '../types/download';
 import useToastStore from '../stores/toastStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useHistoryStore } from '../stores/historyStore';
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 
-/** OS-level notification, honoring the user's desktopNotifications setting. */
-function notifyDesktop(title: string, body: string) {
+/**
+ * OS-level notification honoring desktopNotifications, via the official
+ * notification plugin (Windows toasts / Linux Desktop Notifications) with
+ * a best-effort fallback to the Web Notification API inside the webview.
+ */
+async function notifyDesktop(title: string, body: string) {
   try {
-    if (useSettingsStore.getState().settings.general.desktopNotifications !== false) {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, { body });
+    if (useSettingsStore.getState().settings.general.desktopNotifications === false) return;
+
+    let granted = false;
+    try {
+      granted = await isPermissionGranted();
+      if (!granted) {
+        const perm = await requestPermission();
+        granted = perm === 'granted';
       }
+    } catch {
+      // Plugin channel unavailable (dev server, old backend build) — fall
+      // back to the webview's own Notification API below.
+    }
+    if (granted) {
+      sendNotification({ title, body });
+      return;
+    }
+  } catch {
+    // Fall through to web API below.
+  }
+
+  try {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body });
     }
   } catch {
     // Notifications unavailable — toast feedback already covers it.
   }
+}
+
+/** At most this many parallel get_video_info probes. A batch of N URLs with
+ * no cap spawned N sidecars at once (each installing tooling on first
+ * run), starving later items and hammering the network. */
+const MAX_CONCURRENT_ANALYZING = 3;
+
+/**
+ * Resolves once an analysis slot is free. Items already marked 'analyzing'
+ * in the store count toward the cap, so slots free up as earlier items
+ * finish or get cancelled.
+ */
+function waitForAnalyzeSlot(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const check = () => {
+      const analyzing = useDownloadStore
+        .getState()
+        .downloads.filter((d) => d.status === 'analyzing').length;
+      if (analyzing < MAX_CONCURRENT_ANALYZING) {
+        resolve();
+      } else {
+        setTimeout(check, 500);
+      }
+    };
+    check();
+  });
 }
 
 export function useDownload() {
@@ -77,6 +129,13 @@ export function useDownload() {
     if (payload.status === 'finished') {
       const item = useDownloadStore.getState().downloads.find((d) => d.id === payload.id);
       if (item) {
+        // Persist to the permanent history (backend file) and drop the item
+        // from the active download store — finished entries live in history
+        // from now on, keeping localStorage and queue views lean.
+        useHistoryStore.getState().recordFinished(item);
+        if (useDownloadStore.getState().downloads.some((d) => d.id === payload.id)) {
+          useDownloadStore.getState().removeDownload(payload.id);
+        }
         if (isPlaylistItem(item)) {
           // Notify the last video in the playlist if it wasn't notified yet
           const beforeCompleted = item.completedItems || 0;
@@ -205,6 +264,8 @@ export function useDownload() {
     addToast('info', 'Fetching video information...');
 
     try {
+      // Respect the parallel-analysis cap before probing the backend.
+      await waitForAnalyzeSlot();
       // 1. Fetch metadata using yt-dlp info
       const info = await invoke<any>('get_video_info', { url });
       

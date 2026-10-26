@@ -253,3 +253,34 @@ pub async fn get_video_info(app: AppHandle, url: String) -> Result<Value, String
 
     Err("Could not retrieve URL metadata from sidecar stdout".to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::sweep_partial_files;
+
+    #[test]
+    fn sweep_removes_partial_files_only() {
+        let dir = std::env::temp_dir().join(format!("vdl_sweep_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let partial = dir.join("video.mp4.part");
+        let ytdl = dir.join("video.mp4.ytdl");
+        let tweet = dir.join("video.mp4");
+        std::fs::write(&partial, b"partial").unwrap();
+        std::fs::write(&ytdl, b"meta").unwrap();
+        std::fs::write(&tweet, b"complete data must survive").unwrap();
+
+        sweep_partial_files(dir.to_str().unwrap());
+
+        assert!(!partial.exists(), ".part must be swept");
+        assert!(!ytdl.exists(), ".ytdl must be swept");
+        assert!(tweet.exists(), "completed media must never be swept");
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn sweep_missing_dir_is_silent() {
+        sweep_partial_files("/nonexistent/vdl_path_that_does_not_exist");
+        // No panic == pass.
+    }
+}

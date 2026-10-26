@@ -155,11 +155,6 @@ pub async fn update_tools(app: AppHandle, state: tauri::State<'_, AppState>) -> 
 }
 
 #[tauri::command]
-pub fn exit_app(app: AppHandle) {
-    app.exit(0);
-}
-
-#[tauri::command]
 pub async fn install_app_update(app: AppHandle, file_path: String) -> Result<(), String> {
     let path = std::path::Path::new(&file_path);
     if !path.exists() {

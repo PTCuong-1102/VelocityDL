@@ -6,6 +6,7 @@ import DownloadCard from '../components/ui/DownloadCard';
 import PlaylistCard from '../components/ui/PlaylistCard';
 import GlassPanel from '../components/ui/GlassPanel';
 import { useDownloadStore } from '../stores/downloadStore';
+import useHistoryStore from '../stores/historyStore';
 import { useDownload } from '../hooks/useDownload';
 import useToastStore from '../stores/toastStore';
 import { Platform, isPlaylistItem } from '../types/download';
@@ -23,6 +24,7 @@ const PLATFORM_URLS: Record<Platform, string> = {
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { downloads } = useDownloadStore();
+  const { history } = useHistoryStore();
   const { startDownload, pauseDownload, resumeDownload, cancelDownload, retryDownload, removeDownloadItem } = useDownload();
   const { addToast } = useToastStore();
 
@@ -31,13 +33,13 @@ export const DashboardPage: React.FC = () => {
     .filter((d) => d.status !== 'finished')
     .slice(0, 3);
 
-  // Statistics
-  const totalCompleted = downloads.filter((d) => d.status === 'finished').length;
+  // Statistics — completed counts and total data live in the persistent
+  // history store now: finished items are recorded there and removed from
+  // the active download store immediately.
+  const totalCompleted = history.length;
   const totalActive = downloads.filter((d) => ['downloading', 'merging', 'queued', 'paused'].includes(d.status)).length;
   const totalFailed = downloads.filter((d) => d.status === 'error').length;
-  const totalDataBytes = downloads
-    .filter((d) => d.status === 'finished')
-    .reduce((acc, d) => acc + (d.totalBytes || 0), 0);
+  const totalDataBytes = history.reduce((acc, d) => acc + (d.totalBytes || 0), 0);
   const successRate = (totalCompleted + totalFailed) > 0
     ? Math.round((totalCompleted / (totalCompleted + totalFailed)) * 100)
     : 100;

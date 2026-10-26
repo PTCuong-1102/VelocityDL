@@ -7,7 +7,7 @@
     "core:default",
     "opener:default",
     "dialog:default",
-    "fs:default",
+    "notification:default",
     {
       "identifier": "shell:allow-execute",
       "allow": [

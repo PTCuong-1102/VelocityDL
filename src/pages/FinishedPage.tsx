@@ -1,21 +1,20 @@
 import React from 'react';
 import FinishedCard from '../components/ui/FinishedCard';
-import { useDownloadStore } from '../stores/downloadStore';
+import useHistoryStore from '../stores/historyStore';
 import { useUIStore } from '../stores/uiStore';
 import { useToastStore } from '../stores/toastStore';
 import { AnyDownloadItem, isPlaylistItem } from '../types/download';
 import { invoke } from '@tauri-apps/api/core';
+import { useDownload } from '../hooks/useDownload';
 
 export const FinishedPage: React.FC = () => {
-  const { downloads, clearFinished } = useDownloadStore();
+  const { history, removeEntry, clearAll } = useHistoryStore();
   const { searchQuery } = useUIStore();
   const { addToast } = useToastStore();
-
-  // Get finished items
-  const finishedItems = downloads.filter((d) => d.status === 'finished');
+  const { startDownload } = useDownload();
 
   // Filter finished items by search query
-  const filteredItems = finishedItems.filter((item) => {
+  const filteredItems = history.filter((item) => {
     if (!searchQuery.trim()) return true;
     const titleMatch = item.title?.toLowerCase().includes(searchQuery.toLowerCase());
     const formatMatch = item.format?.toLowerCase().includes(searchQuery.toLowerCase());
@@ -58,6 +57,26 @@ export const FinishedPage: React.FC = () => {
     }
   };
 
+  /**
+   * Re-download a history entry with its original options. The original
+   * item creation path persists every option the queue manager needs on
+   * the item itself (saveDir, maxHeight, subtitles, audio prefs), so the
+   * exact same request can be reconstructed without re-analysis.
+   */
+  const handleRedownload = (item: AnyDownloadItem) => {
+    const options = {
+      maxHeight: isPlaylistItem(item) ? 0 : (item.maxHeight ?? 0),
+      audioOnly: item.mediaType === 'audio',
+      extractSubs: item.extractSubs ?? false,
+      selectedSubtitles: item.selectedSubtitles ?? [],
+      embedSubs: item.embedSubs ?? true,
+      audioFormat: item.audioFormat,
+      audioQuality: item.audioQuality,
+    };
+    void startDownload(item.url, options);
+    addToast('info', `Re-downloading: ${item.title || item.url}`);
+  };
+
   return (
     <div className="flex-col gap-lg w-full" style={{ animation: 'fadeInUp 0.3s ease-out' }}>
       {/* Header Row */}
@@ -65,16 +84,17 @@ export const FinishedPage: React.FC = () => {
         <div className="flex-col">
           <h1>Finished Downloads</h1>
           <p className="text-muted mt-sm" style={{ fontSize: '13px' }}>
-            {finishedItems.length} items downloaded successfully
+            {history.length} items downloaded successfully
           </p>
         </div>
 
-        {finishedItems.length > 0 && (
-          <button 
-            className="btn btn-ghost" 
+        {history.length > 0 && (
+          <button
+            className="btn btn-ghost"
             style={{ fontSize: '12px', padding: '6px 12px', height: '28px', color: 'var(--error)' }}
             onClick={() => {
-              clearFinished();
+              clearAll();
+              addToast('info', 'Download history cleared.');
             }}
           >
             <span className="icon" style={{ fontSize: '16px' }}>delete_sweep</span>
@@ -95,11 +115,13 @@ export const FinishedPage: React.FC = () => {
           }}
         >
           {filteredItems.map((item) => (
-            <FinishedCard 
-              key={item.id} 
-              item={item} 
+            <FinishedCard
+              key={item.id}
+              item={item}
               onPlay={handlePlay}
               onOpenFolder={handleOpenFolder}
+              onRedownload={handleRedownload}
+              onRemove={removeEntry}
             />
           ))}
         </div>

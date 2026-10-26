@@ -142,6 +142,11 @@ export const useDownloadStore = create<DownloadState>()(
     }),
     {
       name: 'velocity-download-store',
+      // Finished items live in the permanent history (backend history.json
+      // via historyStore) — don't keep topping up localStorage with them.
+      partialize: (state) => ({
+        downloads: state.downloads.filter((d) => d.status !== 'finished'),
+      }),
       // Map active statuses to paused on load/hydration
       onRehydrateStorage: () => (state) => {
         if (state) {

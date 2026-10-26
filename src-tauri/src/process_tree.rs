@@ -124,3 +124,32 @@ fn collect_children_pgrep(pid: u32, out: &mut Vec<String>) {
     out.sort();
     out.dedup();
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kill_tree_zero_is_noop() {
+        // Must not panic and must not try to kill pid 0.
+        kill_tree(0);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn collect_children_does_not_panic_on_live_pid() {
+        // Walk /proc for our own process (likely no children) and for pid 1.
+        let mut out = Vec::new();
+        collect_children_linux(std::process::id(), &mut out);
+        let mut out2 = Vec::new();
+        collect_children_linux(1, &mut out2);
+        // Nothing to assert beyond "no panic" — output contents are
+        // environment-dependent.
+    }
+
+    #[test]
+    fn kill_tree_current_process_survives_targeting_absent_pid() {
+        // Kill a pid that almost certainly doesn't exist; must be silent.
+        kill_tree(4_000_000);
+    }
+}
