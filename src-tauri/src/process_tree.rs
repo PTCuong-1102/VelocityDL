@@ -88,7 +88,7 @@ fn collect_children_linux(pid: u32, out: &mut Vec<String>) {
 }
 
 /// macOS (and any other unix): discover descendants with pgrep, then kill.
-#[cfg_attr(target_os = "linux", allow(dead_code))]
+#[cfg_attr(any(windows, target_os = "linux"), allow(dead_code))]
 fn kill_tree_unix_generic(pid: u32) -> Result<(), String> {
     let mut victims: Vec<String> = Vec::new();
     collect_children_pgrep(pid, &mut victims);
@@ -97,6 +97,7 @@ fn kill_tree_unix_generic(pid: u32) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg_attr(any(windows, target_os = "linux"), allow(dead_code))]
 fn collect_children_pgrep(pid: u32, out: &mut Vec<String>) {
     // Depth cap guards against pathological/cyclic input (pgrep output is
     // trusted to be pids, but a broken pgrep could loop forever otherwise).
