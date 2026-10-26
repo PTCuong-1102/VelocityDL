@@ -97,19 +97,48 @@ const Toast: React.FC<ToastProps> = ({ item, onRemove }) => {
         {ICONS[item.type]}
       </span>
 
-      {/* Message */}
-      <span
-        style={{
-          flex: 1,
-          fontSize: '13px',
-          fontWeight: 500,
-          color: 'var(--on-surface)',
-          lineHeight: '1.5',
-          wordBreak: 'break-word',
-        }}
-      >
-        {item.message}
-      </span>
+      {/* Message + optional inline actions */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <span
+          style={{
+            fontSize: '13px',
+            fontWeight: 500,
+            color: 'var(--on-surface)',
+            lineHeight: '1.5',
+            wordBreak: 'break-word',
+          }}
+        >
+          {item.message}
+        </span>
+
+        {item.actions && item.actions.length > 0 && (
+          <div style={{ display: 'flex', gap: '8px', alignSelf: 'flex-end' }}>
+            {item.actions.map((action) => (
+              <button
+                key={action.label}
+                onClick={() => {
+                  try {
+                    action.onClick();
+                  } finally {
+                    handleClose();
+                  }
+                }}
+                className="btn btn-ghost"
+                style={{
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  padding: '2px 10px',
+                  height: '24px',
+                  color: colors.icon,
+                  borderColor: colors.border,
+                }}
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Close button */}
       <button

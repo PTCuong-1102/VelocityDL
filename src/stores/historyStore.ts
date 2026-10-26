@@ -27,6 +27,26 @@ interface HistoryState {
 // next save will drop.
 const MAX_ENTRY = 1000;
 
+// Fresh defaults for the fields the UI always reads. Old history.json files
+// written by earlier app versions may lack these — fill them in once at
+// load so every render can trust the shape.
+function normalizeHistoryEntry(raw: AnyDownloadItem): AnyDownloadItem {
+  return {
+    ...raw,
+    title: raw.title || raw.url || 'Untitled',
+    platform: raw.platform ?? 'other',
+    mediaType: raw.mediaType ?? 'video',
+    progress: typeof raw.progress === 'number' ? raw.progress : 100,
+    downloadedBytes: raw.downloadedBytes ?? 0,
+    totalBytes: raw.totalBytes ?? 0,
+    speed: 0,
+    eta: 0,
+    format: raw.format ?? '—',
+    quality: raw.quality ?? '',
+    completedAt: raw.completedAt ?? raw.createdAt ?? Date.now(),
+  };
+}
+
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 
 /** Debounced whole-array save — history writes happen at most every 2s. */
@@ -46,7 +66,8 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
   loadHistory: async () => {
     try {
       const items = await invoke<AnyDownloadItem[]>('load_history');
-      set({ history: Array.isArray(items) ? items : [], loaded: true });
+      const list = Array.isArray(items) ? items.map(normalizeHistoryEntry) : [];
+      set({ history: list, loaded: true });
     } catch (err) {
       console.warn('Failed to load download history:', err);
       set({ loaded: true }); // proceed with empty rather than blocking UI

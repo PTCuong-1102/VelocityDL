@@ -88,6 +88,21 @@ describe('historyStore', () => {
     expect(useHistoryStore.getState().history).toEqual([]);
     expect(invoke).toHaveBeenLastCalledWith('save_history', { items: [] });
   });
+
+  it('loadHistory normalizes sparse entries from older versions', async () => {
+    // An entry written by an older build: many UI-required fields missing.
+    vi.mocked(invoke).mockResolvedValueOnce([{
+      id: 'old',
+      url: 'https://example.com/old',
+      title: '',
+    } as any]);
+    await useHistoryStore.getState().loadHistory();
+    const loaded = useHistoryStore.getState().history[0];
+    expect(loaded.title).toBe('https://example.com/old'); // fell back to url
+    expect(loaded.mediaType).toBe('video');
+    expect(loaded.speed).toBe(0);
+    expect(loaded.completedAt).toBeGreaterThan(0);
+  });
 });
 
 // Imported after the mock above to keep the allowed import order.

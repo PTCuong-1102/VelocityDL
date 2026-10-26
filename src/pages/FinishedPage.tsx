@@ -6,6 +6,7 @@ import { useToastStore } from '../stores/toastStore';
 import { AnyDownloadItem, isPlaylistItem } from '../types/download';
 import { invoke } from '@tauri-apps/api/core';
 import { useDownload } from '../hooks/useDownload';
+import type { RedownloadChoice } from '../components/ui/FinishedCard';
 
 export const FinishedPage: React.FC = () => {
   const { history, removeEntry, clearAll } = useHistoryStore();
@@ -63,9 +64,11 @@ export const FinishedPage: React.FC = () => {
    * the item itself (saveDir, maxHeight, subtitles, audio prefs), so the
    * exact same request can be reconstructed without re-analysis.
    */
-  const handleRedownload = (item: AnyDownloadItem) => {
+  const handleRedownload = (item: AnyDownloadItem, choice?: RedownloadChoice) => {
     const options = {
-      maxHeight: isPlaylistItem(item) ? 0 : (item.maxHeight ?? 0),
+      maxHeight: isPlaylistItem(item)
+        ? 0
+        : (choice?.maxHeight ?? item.maxHeight ?? 0),
       audioOnly: item.mediaType === 'audio',
       extractSubs: item.extractSubs ?? false,
       selectedSubtitles: item.selectedSubtitles ?? [],
@@ -74,7 +77,7 @@ export const FinishedPage: React.FC = () => {
       audioQuality: item.audioQuality,
     };
     void startDownload(item.url, options);
-    addToast('info', `Re-downloading: ${item.title || item.url}`);
+    addToast('info', `Re-downloading${choice ? ` (${choice.label})` : ''}: ${item.title || item.url}`);
   };
 
   return (

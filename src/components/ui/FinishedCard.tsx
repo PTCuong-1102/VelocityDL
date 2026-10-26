@@ -1,15 +1,22 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AnyDownloadItem, isPlaylistItem } from '../../types/download';
 import { formatBytes } from '../../utils/format';
 import { getPlatformColor } from '../../utils/platform';
 import PlatformIcon from '../shared/PlatformIcon';
+
+/** Quality override for re-downloading a history entry. */
+export interface RedownloadChoice {
+  /** 0 = original option recorded on the item. */
+  maxHeight: number;
+  label: string;
+}
 
 interface FinishedCardProps {
   item: AnyDownloadItem;
   onPlay?: (path: string) => void;
   onOpenFolder?: (item: AnyDownloadItem) => void;
   /** Re-run this entry with its original options (History v2). */
-  onRedownload?: (item: AnyDownloadItem) => void;
+  onRedownload?: (item: AnyDownloadItem, choice?: RedownloadChoice) => void;
   /** Remove this entry from the persistent history. */
   onRemove?: (id: string) => void;
 }
@@ -28,6 +35,16 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
   const canReveal =
     !!item.outputPath ||
     (isPlaylistItem(item) && (item.children || []).some((c) => !!c.outputPath));
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
+
+  const handleRedownloadClick = () => {
+    if (item.mediaType === 'audio') {
+      // Audio entries carry their format as the "quality" — no height menu.
+      onRedownload?.(item);
+      return;
+    }
+    setShowQualityMenu((v) => !v);
+  };
 
   return (
     <div
@@ -216,17 +233,57 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
           )}
 
           {onRedownload && (
-            <button
-              className="btn btn-ghost btn-icon flex-center"
-              style={{
-                width: '28px',
-                height: '28px'
-              }}
-              onClick={() => onRedownload(item)}
-              title="Download again with the original options"
-            >
-              <span className="icon" style={{ fontSize: '16px' }}>refresh</span>
-            </button>
+            <div style={{ position: 'relative' }}>
+              {showQualityMenu && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: '34px',
+                    left: '-32px',
+                    zIndex: 30,
+                    minWidth: '124px',
+                    padding: '4px',
+                    borderRadius: '10px',
+                    border: '1px solid var(--outline-variant)',
+                    background: 'var(--surface-container-lowest)',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.45)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px'
+                  }}
+                >
+                  {[
+                    { label: 'Current quality', maxHeight: 0 },
+                    { label: '1080p', maxHeight: 1080 },
+                    { label: '720p', maxHeight: 720 },
+                    { label: '480p', maxHeight: 480 },
+                  ].map((q) => (
+                    <button
+                      key={q.label}
+                      className="btn btn-ghost"
+                      style={{ fontSize: '12px', padding: '4px 10px', height: '26px', justifyContent: 'flex-start' }}
+                      onClick={() => {
+                        setShowQualityMenu(false);
+                        onRedownload?.(item, q.maxHeight === 0 ? undefined : q);
+                      }}
+                    >
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <button
+                className="btn btn-ghost btn-icon flex-center"
+                style={{
+                  width: '28px',
+                  height: '28px'
+                }}
+                onClick={handleRedownloadClick}
+                title="Download again (choose a different quality)"
+              >
+                <span className="icon" style={{ fontSize: '16px' }}>refresh</span>
+              </button>
+            </div>
           )}
 
           {onRemove && (
