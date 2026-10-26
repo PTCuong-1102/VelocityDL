@@ -31,7 +31,7 @@ pub fn start_download(
         .shell()
         .sidecar("deno-engine")
         .map_err(|e| e.to_string())?
-        .args(&["download", &id, &url, &save_dir, &options_str])
+        .args(["download", &id, &url, &save_dir, &options_str])
         .spawn()
         .map_err(|e| e.to_string())?;
 
@@ -137,7 +137,7 @@ pub fn cancel_download(
     let mut tracked_save_dir = save_dir.clone();
     if let Some(entry) = active.remove(&id) {
         kill_tree(entry.child.pid());
-        known_paths.extend(entry.output_paths.into_iter());
+        known_paths.extend(entry.output_paths);
         if tracked_save_dir.is_empty() {
             tracked_save_dir = entry.save_dir;
         }
@@ -208,7 +208,7 @@ pub async fn get_video_info(app: AppHandle, url: String) -> Result<Value, String
         .shell()
         .sidecar("deno-engine")
         .map_err(|e| e.to_string())?
-        .args(&["info", &url])
+        .args(["info", &url])
         .spawn()
         .map_err(|e| e.to_string())?;
 

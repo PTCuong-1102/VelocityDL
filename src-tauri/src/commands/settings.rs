@@ -42,7 +42,7 @@ pub fn load_settings(app: tauri::AppHandle) -> Result<Value, String> {
     } else {
         // Return default settings structure
         let default_download = get_default_download_path()
-            .unwrap_or_else(|| "".to_string());
+            .unwrap_or_default();
 
         let defaults = json!({
             "engine": {
@@ -110,7 +110,7 @@ pub async fn check_cookies(app: AppHandle, source: String, file_path: String) ->
         .shell()
         .sidecar("deno-engine")
         .map_err(|e| e.to_string())?
-        .args(&["check-cookies", &source, &file_path])
+        .args(["check-cookies", &source, &file_path])
         .spawn()
         .map_err(|e| e.to_string())?;
 

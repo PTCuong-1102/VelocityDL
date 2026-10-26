@@ -12,7 +12,7 @@ pub async fn check_app_update(app: AppHandle, current_version: String) -> Result
         .shell()
         .sidecar("deno-engine")
         .map_err(|e| e.to_string())?
-        .args(&["check-app-update", &current_version])
+        .args(["check-app-update", &current_version])
         .spawn()
         .map_err(|e| e.to_string())?;
 
@@ -61,7 +61,7 @@ pub fn start_app_update_download(
         .shell()
         .sidecar("deno-engine")
         .map_err(|e| e.to_string())?
-        .args(&["download-app-update", &url, &save_dir, &file_name])
+        .args(["download-app-update", &url, &save_dir, &file_name])
         .spawn()
         .map_err(|e| e.to_string())?;
 
@@ -107,7 +107,7 @@ pub async fn update_tools(app: AppHandle, state: tauri::State<'_, AppState>) -> 
         .shell()
         .sidecar("deno-engine")
         .map_err(|e| e.to_string())?
-        .args(&["update"])
+        .args(["update"])
         .spawn()
         .map_err(|e| e.to_string())?;
 
@@ -201,11 +201,11 @@ pub async fn install_app_update(app: AppHandle, file_path: String) -> Result<(),
             return Ok(());
         } else if lower.ends_with(".deb") {
             let res = Command::new("pkexec")
-                .args(&["apt", "install", "-y", &file_path])
+                .args(["apt", "install", "-y", &file_path])
                 .spawn();
             if res.is_err() {
                 Command::new("pkexec")
-                    .args(&["dpkg", "-i", &file_path])
+                    .args(["dpkg", "-i", &file_path])
                     .spawn()
                     .map_err(|e| format!("Failed to install .deb package: {}", e))?;
             }
@@ -213,11 +213,11 @@ pub async fn install_app_update(app: AppHandle, file_path: String) -> Result<(),
             return Ok(());
         } else if lower.ends_with(".rpm") {
             let res = Command::new("pkexec")
-                .args(&["dnf", "install", "-y", &file_path])
+                .args(["dnf", "install", "-y", &file_path])
                 .spawn();
             if res.is_err() {
                 Command::new("pkexec")
-                    .args(&["rpm", "-Uvh", &file_path])
+                    .args(["rpm", "-Uvh", &file_path])
                     .spawn()
                     .map_err(|e| format!("Failed to install .rpm package: {}", e))?;
             }
@@ -225,7 +225,7 @@ pub async fn install_app_update(app: AppHandle, file_path: String) -> Result<(),
             return Ok(());
         } else if lower.ends_with(".pkg.tar.zst") || lower.ends_with(".pkg.tar.xz") {
             Command::new("pkexec")
-                .args(&["pacman", "-U", "--noconfirm", &file_path])
+                .args(["pacman", "-U", "--noconfirm", &file_path])
                 .spawn()
                 .map_err(|e| format!("Failed to install package with pacman: {}", e))?;
             app.exit(0);

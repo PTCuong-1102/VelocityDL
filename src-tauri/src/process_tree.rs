@@ -6,7 +6,7 @@
 //! Strategy per platform:
 //! - Windows: `taskkill /PID <pid> /T /F` (native tree kill).
 //! - Linux:   walk `/proc/<pid>/task/<tid>/children` recursively and SIGKILL
-//!            every descendant, then the root itself.
+//!   every descendant, then the root itself.
 //! - macOS:   recursive `pgrep -P <child>` discovery + `kill -9`.
 //!
 //! Falls back to `kill -9 <pid>` for the root when discovery partially fails,

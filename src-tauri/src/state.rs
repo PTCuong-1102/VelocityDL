@@ -24,3 +24,9 @@ impl AppState {
         }
     }
 }
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self::new()
+    }
+}

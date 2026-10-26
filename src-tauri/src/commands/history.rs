@@ -48,6 +48,7 @@ pub fn save_history(app: AppHandle, items: Vec<Value>) -> Result<(), String> {
 }
 
 /// Append-to-front helper used by the tests below.
+#[cfg(test)]
 fn bounded_push(items: &mut Vec<Value>, entry: Value) {
     items.insert(0, entry);
     if items.len() > MAX_HISTORY_ENTRIES {

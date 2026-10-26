@@ -70,3 +70,6 @@ jobs:
 
       - name: Cargo test
         run: cd src-tauri && cargo test
+
+      - name: Clippy (deny warnings)
+        run: cd src-tauri && cargo clippy -- -D warnings
