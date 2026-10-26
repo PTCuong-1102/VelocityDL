@@ -38,7 +38,7 @@ jobs:
         run: npm run build:deno:win
 
       - name: Build Tauri Desktop App
-        run: npx tauri build
+        run: npx tauri build --bundles nsis,msi
 
       - name: Upload NSIS Installer (.exe)
         uses: actions/upload-artifact@v4

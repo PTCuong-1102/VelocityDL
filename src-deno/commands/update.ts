@@ -1,6 +1,20 @@
 import * as path from "jsr:@std/path";
 import { getYtdlpPath, getBinDir, getFfmpegPath, getFfprobePath, getFfmpegDir, getSpotdlPath, getGallerydlPath, getInstaloaderPath } from "../utils/paths.ts";
 
+/** Metadata/API fetch with a hard timeout (checksums, release lookups). */
+export async function fetchApiWithTimeout(
+  url: string,
+  timeoutMs = 20_000,
+): Promise<Response> {
+  return fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+}
+
+/** Binary/archive download with a generous overall cap (a stalled, not
+ * slow, transfer must not hang the sidecar forever). */
+export function fetchBinaryWithTimeout(url: string, timeoutMs = 600_000): Promise<Response> {
+  return fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+}
+
 export async function ensureYtdlpInstalled(forceUpdate = false): Promise<string> {
   const ytdlpPath = getYtdlpPath();
   const binDir = getBinDir();

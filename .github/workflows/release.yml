@@ -54,6 +54,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          # Explicit per-host bundle list: on Linux the bundler does NOT skip
+          # the nsis target (only msi/deb/... are cfg-gated) and would attempt
+          # a cargo-xwin cross build; on Windows, deb/rpm/appimage are
+          # skipped anyway — pinning the list makes both legs deterministic.
+          args: ${{ matrix.platform == 'ubuntu-22.04' && '--bundles deb,rpm,appimage' || '--bundles nsis,msi' }}
           tagName: v__VERSION__
           releaseName: 'VelocityDL v__VERSION__'
           releaseBody: 'VelocityDL desktop release for Windows and Linux.'
