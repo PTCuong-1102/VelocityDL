@@ -749,16 +749,40 @@ async function downloadYtdlp(
  * yt-dlp-style %(progress)s templates. Polled periodically while the
  * child process runs; speed is derived from delta between polls.
  */
-async function dirSizeBytes(dir: string): Promise<number> {
+async function snapshotDirFiles(dir: string): Promise<Set<string>> {
+  const names = new Set<string>();
+  try {
+    for await (const entry of Deno.readDir(dir)) {
+      const full = `${dir}/${entry.name}`;
+      try {
+        if (entry.isFile) {
+          names.add(full);
+        } else if (entry.isDirectory) {
+          for (const sub of await snapshotDirFiles(full)) names.add(sub);
+        }
+      } catch (_) { /* vanishing file — ignore */ }
+    }
+  } catch (_) { /* saveDir not created yet — baseline is empty */ }
+  return names;
+}
+
+/**
+ * Sum of sizes (bytes) of files NOT present at start — used as a REAL
+ * progress signal for tools (gallery-dl / instaloader) that don't print
+ * yt-dlp-style %(progress)s templates. Two downloads sharing a saveDir
+ * previously inflated each other's progress/speed; the pre-start snapshot
+ * keeps the signal per-download. Speed derives from delta between polls.
+ */
+async function dirNewBytes(dir: string, baseline: Set<string>): Promise<number> {
   let total = 0;
   try {
     for await (const entry of Deno.readDir(dir)) {
       const full = `${dir}/${entry.name}`;
       try {
         if (entry.isFile) {
-          total += (await Deno.stat(full)).size;
+          if (!baseline.has(full)) total += (await Deno.stat(full)).size;
         } else if (entry.isDirectory) {
-          total += await dirSizeBytes(full);
+          total += await dirNewBytes(full, baseline);
         }
       } catch (_) { /* file vanished mid-download — ignore */ }
     }
@@ -883,6 +907,7 @@ async function fetchFacebookPage(pageUrl: string, cookieHeader: string): Promise
       "Referer": "https://www.facebook.com/",
     },
     redirect: "follow",
+    signal: AbortSignal.timeout(30_000),
   });
   // fetch follows redirects: a landing on login.php means cookies are bad/expired.
   if (resp.url.includes("login.php")) {
@@ -918,6 +943,7 @@ async function downloadCdnFile(
       "User-Agent": FB_CHROME_UA,
       "Referer": "https://www.facebook.com/",
     },
+    signal: AbortSignal.timeout(600_000),
   });
   if (!resp.ok || !resp.body) {
     throw new Error(`CDN download failed with HTTP ${resp.status}.`);
@@ -1105,8 +1131,8 @@ async function downloadInstagramStory(
   // Instaloader logs progress to STDERR — scan it for completed media files too.
   let filesCompleted = 0;
   let outputPath = "";
-  const baseBytes = await dirSizeBytes(saveDir);
-  let lastBytes = baseBytes;
+  const baselineFiles = await snapshotDirFiles(saveDir);
+  let lastBytes = 0;
   let lastTime = Date.now();
   const stderrPromise = (async () => {
     while (true) {
@@ -1126,15 +1152,15 @@ async function downloadInstagramStory(
         if (looksLikeMediaFile(trimmed)) {
           filesCompleted++;
           const now = Date.now();
-          const currentBytes = await dirSizeBytes(saveDir);
+          const newBytes = await dirNewBytes(saveDir, baselineFiles);
           const dt = Math.max(1, (now - lastTime) / 1000);
-          const speed = Math.max(0, (currentBytes - lastBytes) / dt);
-          lastBytes = currentBytes;
+          const speed = Math.max(0, (newBytes - lastBytes) / dt);
+          lastBytes = newBytes;
           lastTime = now;
           emitFileProgress({
             id,
             filesCompleted,
-            downloadedBytes: Math.max(0, currentBytes - baseBytes),
+            downloadedBytes: newBytes,
             speed,
             outputPath,
           });
@@ -1167,15 +1193,15 @@ async function downloadInstagramStory(
       if (looksLikeMediaFile(trimmed)) {
         filesCompleted++;
         const now = Date.now();
-        const currentBytes = await dirSizeBytes(saveDir);
+        const newBytes = await dirNewBytes(saveDir, baselineFiles);
         const dt = Math.max(1, (now - lastTime) / 1000);
-        const speed = Math.max(0, (currentBytes - lastBytes) / dt);
-        lastBytes = currentBytes;
+        const speed = Math.max(0, (newBytes - lastBytes) / dt);
+        lastBytes = newBytes;
         lastTime = now;
         emitFileProgress({
           id,
           filesCompleted,
-          downloadedBytes: Math.max(0, currentBytes - baseBytes),
+          downloadedBytes: newBytes,
           speed,
           outputPath,
         });
@@ -1248,32 +1274,30 @@ async function downloadGallerydl(
   let stderrOutput = "";
   let filesCompleted = 0;
   let outputPath = "";
-  const baseBytes = await dirSizeBytes(saveDir);
-  let lastBytes = baseBytes;
+  const baselineFiles = await snapshotDirFiles(saveDir);
+  let lastBytes = 0;
   let lastTime = Date.now();
   const handleGalleryLine = async (trimmed: string) => {
     if (!trimmed) return;
     // gallery-dl --verbose prints completed file paths; only those count.
-    if (trimmed.startsWith(saveDir) || looksLikeMediaFile(trimmed)) {
-      if (looksLikeMediaFile(trimmed) || trimmed.startsWith(saveDir)) {
-        outputPath = trimmed.length < 1024 ? trimmed : outputPath;
-      }
-      if (looksLikeMediaFile(trimmed)) {
-        filesCompleted++;
-        const now = Date.now();
-        const currentBytes = await dirSizeBytes(saveDir);
-        const dt = Math.max(1, (now - lastTime) / 1000);
-        const speed = Math.max(0, (currentBytes - lastBytes) / dt);
-        lastBytes = currentBytes;
-        lastTime = now;
-        emitFileProgress({
-          id,
-          filesCompleted,
-          downloadedBytes: Math.max(0, currentBytes - baseBytes),
-          speed,
-          outputPath,
-        });
-      }
+    if (looksLikeMediaFile(trimmed) || trimmed.startsWith(saveDir)) {
+      if (trimmed.length < 1024) outputPath = trimmed;
+    }
+    if (looksLikeMediaFile(trimmed)) {
+      filesCompleted++;
+      const now = Date.now();
+      const newBytes = await dirNewBytes(saveDir, baselineFiles);
+      const dt = Math.max(1, (now - lastTime) / 1000);
+      const speed = Math.max(0, (newBytes - lastBytes) / dt);
+      lastBytes = newBytes;
+      lastTime = now;
+      emitFileProgress({
+        id,
+        filesCompleted,
+        downloadedBytes: newBytes,
+        speed,
+        outputPath,
+      });
     }
   };
   const stderrPromise = (async () => {

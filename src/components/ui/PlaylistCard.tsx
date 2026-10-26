@@ -28,6 +28,7 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
   const isDownloading = item.status === 'downloading';
   const isPaused = item.status === 'paused';
   const isError = item.status === 'error';
+  const isCancelled = item.status === 'cancelled';
   const isQueued = item.status === 'queued';
   const platformColor = getPlatformColor(item.platform);
 
@@ -108,9 +109,9 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
             </span>
           </div>
 
-          <ProgressBar 
-            percent={item.progress} 
-            variant={isDownloading ? 'primary' : isPaused ? 'muted' : 'secondary'} 
+          <ProgressBar
+            percent={item.progress}
+            variant={isDownloading ? 'primary' : 'muted'}
             size="sm"
             shimmer={isDownloading}
           />
@@ -159,7 +160,18 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
             </button>
           )}
 
-          {(isPaused || isQueued || isError) && onRemove && (
+          {isCancelled && onRetry && (
+            <button
+              className="btn btn-ghost btn-icon flex-center"
+              style={{ width: '32px', height: '32px', color: 'var(--secondary)' }}
+              onClick={() => onRetry(item.id)}
+              title="Retry download"
+            >
+              <span className="icon">refresh</span>
+            </button>
+          )}
+
+          {(isPaused || isQueued || isError || isCancelled) && onRemove && (
             <button
               className="btn btn-ghost btn-icon flex-center"
               style={{ width: '32px', height: '32px', color: 'var(--on-surface-variant)' }}

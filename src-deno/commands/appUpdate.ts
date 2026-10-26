@@ -1,5 +1,63 @@
 import * as path from "jsr:@std/path";
 
+/** Metadata (release lookup) fetch with a hard timeout. */
+function fetchApiWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(20_000) });
+}
+
+/** Installer fetch cap — a stalled transfer must not hang the updater. */
+function fetchBinaryWithTimeout(url: string): Promise<Response> {
+  return fetch(url, { signal: AbortSignal.timeout(900_000) });
+}
+
+/**
+ * Integrity gate for the app installer released by GitHub. Prefers the
+ * official `.sha256` sidecar asset published next to it; without one,
+ * falls back to a size sanity check so a truncated / HTML-error-page
+ * download can not be installed.
+ * The installer file is DELETED on any verification failure.
+ */
+async function verifyInstallerIntegrity(
+  filePath: string,
+  downloadUrl: string,
+): Promise<void> {
+  let expected = "";
+  try {
+    const res = await fetchApiWithTimeout(`${downloadUrl}.sha256`);
+    if (res.ok) {
+      const first = (await res.text()).trim().split(/\s+/)[0].toLowerCase();
+      if (/^[0-9a-f]{64}$/.test(first)) expected = first;
+    }
+  } catch (_) { /* sidecar absent or unreachable — fall through */ }
+
+  const data = await Deno.readFile(filePath);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const actual = Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  if (expected) {
+    if (actual !== expected) {
+      await Deno.remove(filePath).catch(() => {});
+      throw new Error(
+        `Installer checksum mismatch!\n  Expected: ${expected}\n  Actual:   ${actual}\n` +
+        "The installer has been deleted. Try the update again later.",
+      );
+    }
+    console.log(JSON.stringify({ status: "info", message: "Installer checksum verified OK." }));
+    return;
+  }
+
+  console.log(JSON.stringify({
+    status: "warning",
+    message: "No .sha256 sidecar for this installer — performing size sanity check only.",
+  }));
+  if (data.length < 3_000_000) {
+    await Deno.remove(filePath).catch(() => {});
+    throw new Error(`Installer looks truncated (${data.length} bytes) — deleted, try again later.`);
+  }
+}
+
 export interface LinuxDistroInfo {
   id: string;
   name: string;
@@ -81,7 +139,7 @@ export async function checkAppUpdate(currentVersion: string): Promise<void> {
   const url = `https://api.github.com/repos/${repo}/releases/latest`;
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchApiWithTimeout(url, {
       headers: {
         "User-Agent": "VelocityDL-Updater"
       }
@@ -196,7 +254,7 @@ export async function downloadAppUpdate(
       message: "Starting download of new update..."
     }));
 
-    const response = await fetch(downloadUrl);
+    const response = await fetchBinaryWithTimeout(downloadUrl);
     if (!response.ok) {
       throw new Error(`Failed to download update: ${response.statusText}`);
     }
@@ -242,6 +300,10 @@ export async function downloadAppUpdate(
     }
 
     await writer.close();
+
+    // Verify integrity BEFORE declaring ready — the frontend only enables
+    // "Install" after a verified (or sensibly-sized) installer exists.
+    await verifyInstallerIntegrity(filePath, downloadUrl);
 
     console.log(JSON.stringify({
       status: "ready",

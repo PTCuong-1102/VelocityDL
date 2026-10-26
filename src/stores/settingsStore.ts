@@ -35,6 +35,35 @@ const DEFAULT_SETTINGS: AppSettings = {
   },
 };
 
+/**
+ * Deep-merge loaded settings over DEFAULT_SETTINGS. settings.json is read
+ * raw from disk (versions evolve independently) — a file from an older
+ * release might lack keys like `general` or `engine.speedLimit`; storing
+ * it verbatim left fields undefined and crashed `settings.general.theme`
+ * consumers at render time (white screen on upgrade).
+ */
+export function mergeWithDefaults(raw: unknown, defaults = DEFAULT_SETTINGS): AppSettings {
+  if (typeof raw !== 'object' || raw === null) return defaults;
+  const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+    typeof v === 'object' && v !== null && !Array.isArray(v);
+  const merge = <T extends Record<string, unknown>>(saved: unknown, defs: T): T => {
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(defs)) {
+      const def = defs[key];
+      const savedVal = (saved as Record<string, unknown>)[key];
+      if (isPlainObject(def) && isPlainObject(savedVal)) {
+        out[key] = merge(savedVal, def as Record<string, unknown>);
+      } else if (savedVal !== undefined && savedVal !== null && typeof savedVal === typeof def) {
+        out[key] = savedVal;
+      } else {
+        out[key] = def;
+      }
+    }
+    return out as T;
+  };
+  return merge(raw, { ...defaults });
+}
+
 // Debounce helper
 let saveTimeout: number | undefined;
 
@@ -73,7 +102,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     return { settings: nextSettings };
   }),
   
-  setAllSettings: (settings) => set({ settings }),
+  setAllSettings: (settings) => set({ settings: mergeWithDefaults(settings) }),
   
   resetDefaults: () => set(() => {
     saveSettingsDebounced(DEFAULT_SETTINGS, set);

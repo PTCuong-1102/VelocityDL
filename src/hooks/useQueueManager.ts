@@ -99,11 +99,12 @@ export const useQueueManager = () => {
         ds.filter((d) => d.status === 'downloading' || d.status === 'merging').length;
       // A new job became eligible, a slot freed up (pause/cancel/remove),
       // or a job finished/errored.
+      const prevById = new Map(prevState.downloads.map((p) => [p.id, p]));
       const hasNewQueued = state.downloads.some(
-        (d) => d.status === 'queued' && !prevState.downloads.some((p) => p.id === d.id && p.status === 'queued')
+        (d) => d.status === 'queued' && prevById.get(d.id)?.status !== 'queued'
       );
-      const hasFinishedOrError = state.downloads.some((d, i) => {
-        const prev = prevState.downloads[i];
+      const hasFinishedOrError = state.downloads.some((d) => {
+        const prev = prevById.get(d.id);
         return prev && (prev.status === 'downloading' || prev.status === 'merging') &&
                (d.status === 'finished' || d.status === 'error');
       });

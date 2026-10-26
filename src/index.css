@@ -377,6 +377,10 @@ code, .mono {
   background-color: var(--error);
 }
 
+.status-dot.cancelled {
+  background-color: var(--outline);
+}
+
 .status-dot.queued {
   background-color: var(--outline);
 }

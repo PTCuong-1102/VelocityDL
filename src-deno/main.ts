@@ -45,11 +45,21 @@ async function main() {
     }
     if (command !== "update" && command !== "check-app-update" && command !== "download-app-update") {
       await maybeAutoUpdateTools(settings?.engine?.autoUpdateYtdlp !== false);
-      await ensureYtdlpInstalled();
-      await ensureFfmpegInstalled();
-      await ensureSpotdlInstalled();
-      await ensureGallerydlInstalled();
-      await ensureInstaloaderInstalled();
+      // Install/verify all tools in parallel — sequential probing meant
+      // ~5 network round-trips before every download could start.
+      const results = await Promise.allSettled([
+        ensureYtdlpInstalled(),
+        ensureFfmpegInstalled(),
+        ensureSpotdlInstalled(),
+        ensureGallerydlInstalled(),
+        ensureInstaloaderInstalled(),
+      ]);
+      const failures = results
+        .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+        .map((r) => r.reason instanceof Error ? r.reason.message : String(r.reason));
+      if (failures.length > 0) {
+        throw new Error(`Tool setup failed: ${failures.join(" | ")}`);
+      }
       await touchToolsMarker();
     }
 

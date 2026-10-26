@@ -185,6 +185,11 @@ VelocityDL/
 
 ### Installation
 
+> [!NOTE]
+> **macOS:** the codebase builds on macOS (`.dmg` logic exists in the
+> updater), but releases are currently **not published** for macOS — the
+> release matrix covers Windows and Linux only.
+
 > [!IMPORTANT]
 > The compiled Deno sidecar binary (`src-tauri/binaries/deno-engine-*.exe`) is **not included** in the repository due to GitHub's 100 MB file size limit. You **must** build it locally after cloning.
 
@@ -271,8 +276,9 @@ Every binary download is verified against the official **SHA-256 checksum** publ
 - All download processes run as **isolated child processes** — not in the Tauri/Rust main thread.
 - The sidecar binary is **allow-listed** in Tauri capabilities (`shell:allow-execute`).
 - yt-dlp binary integrity is verified via **SHA-256 checksum** after every installation or update.
+- App update installers are verified against the published **`.sha256`** sidecar before they are launched (size sanity-checked when a sidecar is missing).
 - Corrupt or mismatched binaries are **automatically deleted** before throwing an error.
-- All active child processes are **killed on app exit** to prevent orphaned background processes.
+- All active child processes (including the yt-dlp children of the sidecar) are **killed as a process tree** on pause, cancel, or app exit to prevent orphaned background downloads.
 
 ---
 

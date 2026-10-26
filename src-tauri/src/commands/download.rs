@@ -1,3 +1,4 @@
+use crate::process_tree::kill_tree;
 use crate::proxy::apply_proxy_from_settings;
 use crate::state::{ActiveDownload, AppState};
 use serde_json::Value;
@@ -14,6 +15,14 @@ pub fn start_download(
     save_dir: String,
     options: Value,
 ) -> Result<(), String> {
+    // Guard against duplicate spawns: a second invoke with the same id used
+    // to overwrite the map entry and leak the first sidecar indefinitely.
+    {
+        let active = state.active_downloads.lock().map_err(|e| format!("Lock poisoned: {}", e))?;
+        if active.contains_key(&id) {
+            return Err(format!("Download {} is already active", id));
+        }
+    }
     apply_proxy_from_settings(&app);
     let options_str = serde_json::to_string(&options).map_err(|e| e.to_string())?;
 
@@ -105,7 +114,10 @@ pub fn start_download(
 pub fn pause_download(state: State<'_, AppState>, id: String) -> Result<(), String> {
     let mut active = state.active_downloads.lock().map_err(|e| format!("Lock poisoned: {}", e))?;
     if let Some(entry) = active.remove(&id) {
-        entry.child.kill().map_err(|e| e.to_string())?;
+        // Kill the whole sidecar tree: the Deno engine runs yt-dlp as a child,
+        // and leaving that child alive would keep downloading after "pause"
+        // (and later race a resumed job on the same .part file).
+        kill_tree(entry.child.pid());
     }
     Ok(())
 }
@@ -124,7 +136,7 @@ pub fn cancel_download(
         file_paths.into_iter().filter(|p| !p.is_empty()).collect();
     let mut tracked_save_dir = save_dir.clone();
     if let Some(entry) = active.remove(&id) {
-        let _ = entry.child.kill();
+        kill_tree(entry.child.pid());
         known_paths.extend(entry.output_paths.into_iter());
         if tracked_save_dir.is_empty() {
             tracked_save_dir = entry.save_dir;
@@ -152,24 +164,41 @@ pub fn cancel_download(
     }
 
     if no_active_left && !tracked_save_dir.is_empty() {
-        if let Ok(entries) = std::fs::read_dir(&tracked_save_dir) {
-            for entry in entries.flatten() {
-                let p = entry.path();
-                if !p.is_file() {
-                    continue;
-                }
-                let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-                if name.ends_with(".part")
-                    || name.ends_with(".ytdl")
-                    || name.ends_with(".temp")
-                    || name.ends_with(".tmp")
-                {
-                    let _ = std::fs::remove_file(&p);
-                }
-            }
+        // Re-verify emptiness immediately before the sweep: another
+        // start_download may have slipped in between drop() and here, and
+        // deleting .part files under a just-started job corrupts it.
+        if no_other_active_downloads(&state) {
+            sweep_partial_files(&tracked_save_dir);
         }
     }
     Ok(())
+}
+
+/// Fail-safe emptiness probe: never sweep while unsure.
+fn no_other_active_downloads(state: &State<'_, AppState>) -> bool {
+    match state.active_downloads.lock() {
+        Ok(active) => active.is_empty(),
+        Err(_) => false,
+    }
+}
+
+fn sweep_partial_files(save_dir: &str) {
+    if let Ok(entries) = std::fs::read_dir(save_dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if !p.is_file() {
+                continue;
+            }
+            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if name.ends_with(".part")
+                || name.ends_with(".ytdl")
+                || name.ends_with(".temp")
+                || name.ends_with(".tmp")
+            {
+                let _ = std::fs::remove_file(&p);
+            }
+        }
+    }
 }
 
 #[tauri::command]

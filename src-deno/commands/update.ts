@@ -32,7 +32,7 @@ export async function ensureYtdlpInstalled(forceUpdate = false): Promise<string>
     : "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
 
   try {
-    const response = await fetch(url);
+    const response = await fetchBinaryWithTimeout(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.statusText}`);
     }
@@ -125,7 +125,7 @@ export async function tryVerifySidecarSha256(
   let expected = "";
   for (const candidate of [`${downloadUrl}.sha256`, `${downloadUrl}.sha256sum`]) {
     try {
-      const res = await fetch(candidate);
+      const res = await fetchApiWithTimeout(candidate);
       if (!res.ok) continue;
       const text = (await res.text()).trim();
       const first = text.split(/\s+/)[0].toLowerCase();
@@ -162,7 +162,7 @@ async function verifyChecksum(binaryPath: string, isWindows: boolean): Promise<v
   let expectedHash: string | undefined;
 
   try {
-    const res = await fetch(checksumUrl);
+    const res = await fetchApiWithTimeout(checksumUrl);
     if (!res.ok) {
       // Non-fatal: if we can't fetch checksums, log warning and continue
       console.error(JSON.stringify({
@@ -303,7 +303,7 @@ async function downloadFfmpegWindows(targetDir: string): Promise<void> {
       message: "Downloading FFmpeg archive..."
     }));
 
-    const response = await fetch(downloadUrl);
+    const response = await fetchBinaryWithTimeout(downloadUrl);
     if (!response.ok) {
       throw new Error(`Failed to download FFmpeg: ${response.statusText}`);
     }
@@ -377,7 +377,7 @@ async function downloadFfmpegUnix(targetDir: string): Promise<void> {
       message: "Downloading FFmpeg archive..."
     }));
 
-    const response = await fetch(downloadUrl);
+    const response = await fetchBinaryWithTimeout(downloadUrl);
     if (!response.ok) {
       throw new Error(`Failed to download FFmpeg: ${response.statusText}`);
     }
@@ -489,7 +489,7 @@ export async function ensureSpotdlInstalled(forceUpdate = false): Promise<string
 
   let url = "";
   try {
-    const response = await fetch("https://api.github.com/repos/spotDL/spotify-downloader/releases/latest");
+    const response = await fetchApiWithTimeout("https://api.github.com/repos/spotDL/spotify-downloader/releases/latest");
     if (response.ok) {
       const releaseData = await response.json();
       const assets = releaseData.assets || [];
@@ -524,7 +524,7 @@ export async function ensureSpotdlInstalled(forceUpdate = false): Promise<string
   }
 
   try {
-    const response = await fetch(url);
+    const response = await fetchBinaryWithTimeout(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.statusText}`);
     }
@@ -590,7 +590,7 @@ export async function ensureGallerydlInstalled(forceUpdate = false): Promise<str
   let url = "";
 
   try {
-    const response = await fetch("https://codeberg.org/api/v1/repos/mikf/gallery-dl/releases");
+    const response = await fetchApiWithTimeout("https://codeberg.org/api/v1/repos/mikf/gallery-dl/releases");
     if (response.ok) {
       const releases = await response.json();
       if (releases && releases.length > 0) {
@@ -624,7 +624,7 @@ export async function ensureGallerydlInstalled(forceUpdate = false): Promise<str
   }
 
   try {
-    const response = await fetch(url);
+    const response = await fetchBinaryWithTimeout(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.statusText}`);
     }
@@ -769,7 +769,7 @@ export async function ensureInstaloaderInstalled(forceUpdate = false): Promise<s
 
   let url = "";
   try {
-    const response = await fetch("https://api.github.com/repos/instaloader/instaloader/releases/latest");
+    const response = await fetchApiWithTimeout("https://api.github.com/repos/instaloader/instaloader/releases/latest");
     if (response.ok) {
       const releaseData = await response.json();
       const assets = releaseData.assets || [];
@@ -793,7 +793,7 @@ export async function ensureInstaloaderInstalled(forceUpdate = false): Promise<s
   const tempZip = await Deno.makeTempFile({ suffix: ".zip" });
 
   try {
-    const response = await fetch(url);
+    const response = await fetchBinaryWithTimeout(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch: ${response.statusText}`);
     }
@@ -889,13 +889,27 @@ export async function maybeAutoUpdateTools(autoUpdateEnabled: boolean): Promise<
     message: "Auto-updating download tools (weekly check)...",
   }));
   try {
-    await ensureYtdlpInstalled(true);
-    await ensureFfmpegInstalled(true);
-    await ensureSpotdlInstalled(true);
-    await ensureGallerydlInstalled(true);
-    await ensureInstaloaderInstalled(true);
-    await touchToolsMarker();
-    console.log(JSON.stringify({ status: "ready", message: "Download tools updated." }));
+    // Update all tools in parallel vs sequential (~5× faster weekly check).
+    // Individual failures are reported but any single tool update failing
+    // must not block the others.
+    const results = await Promise.allSettled([
+      ensureYtdlpInstalled(true),
+      ensureFfmpegInstalled(true),
+      ensureSpotdlInstalled(true),
+      ensureGallerydlInstalled(true),
+      ensureInstaloaderInstalled(true),
+    ]);
+    const failures = results
+      .filter((r): r is PromiseRejectedResult => r.status === "rejected")
+      .map((r) => r.reason instanceof Error ? r.reason.message : String(r.reason));
+    if (failures.length === 0) {
+      // Only record a "checked" marker when every tool succeeded, so a
+      // partial failure retries on the next startup instead of 7 days later.
+      await touchToolsMarker();
+      console.log(JSON.stringify({ status: "ready", message: "Download tools updated." }));
+    } else {
+      throw new Error(failures.join(" | "));
+    }
   } catch (err) {
     console.error(JSON.stringify({
       status: "warning",

@@ -36,7 +36,10 @@ export const useDownloadStore = create<DownloadState>()(
           // User-driven terminal-ish states win over stale backend events:
           // a progress/finish line buffered before pause/cancel/kill must not
           // resurrect the item. Only an explicit retry (→queued) re-arms it.
-          if (item.status === 'paused' || item.status === 'error') return item;
+          // User-driven terminal-ish states win over stale backend events:
+          // a progress/finish line buffered before pause/cancel/kill must not
+          // resurrect the item. Only an explicit retry (→queued) re-arms it.
+          if (item.status === 'paused' || item.status === 'cancelled' || item.status === 'error') return item;
 
           if (isPlaylistItem(item)) {
             let completedItems = item.completedItems;
@@ -122,8 +125,8 @@ export const useDownloadStore = create<DownloadState>()(
       })),
       
       cancelDownload: (id) => set((state) => ({
-        downloads: state.downloads.map((item) => 
-          item.id === id ? { ...item, status: 'error' as DownloadStatus, error: 'Cancelled by user', speed: 0 } : item
+        downloads: state.downloads.map((item) =>
+          item.id === id ? { ...item, status: 'cancelled' as DownloadStatus, speed: 0, eta: 0 } : item
         ),
       })),
       

@@ -1,7 +1,9 @@
 pub mod commands;
+pub mod process_tree;
 pub mod proxy;
 pub mod state;
 
+use process_tree::kill_tree;
 use state::AppState;
 use tauri::Manager;
 
@@ -47,11 +49,8 @@ pub fn run() {
                 if let Some(state) = window.try_state::<AppState>() {
                     if let Ok(mut active) = state.active_downloads.lock() {
                         for (id, entry) in active.drain() {
-                            if let Err(e) = entry.child.kill() {
-                                eprintln!("[Cleanup] Failed to kill download process {}: {}", id, e);
-                            } else {
-                                println!("[Cleanup] Killed download process: {}", id);
-                            }
+                            kill_tree(entry.child.pid());
+                            println!("[Cleanup] Killed download process tree: {}", id);
                         }
                     }
                 }

@@ -295,6 +295,7 @@ export async function getVideoInfo(url: string): Promise<void> {
         args: ["save", url, "--save-file", tempFile],
         stdout: "piped",
         stderr: "piped",
+        signal: AbortSignal.timeout(120_000),
       });
 
       const output = await command.output();
@@ -395,6 +396,10 @@ export async function getVideoInfo(url: string): Promise<void> {
       args,
       stdout: "piped",
       stderr: "piped",
+      // Bounded analysis: without this a hung yt-dlp (live streams, dead
+      // network, token expiry) left the UI item 'analyzing' forever, and
+      // the untracked sidecar could not be cancelled end-to-end.
+      signal: AbortSignal.timeout(120_000),
     });
 
     const output = await command.output();
