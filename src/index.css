@@ -34,10 +34,31 @@
   /* Outline & borders */
   --outline: #918fa1;
   --outline-variant: #464555;
+
+  /* Theme-aware component surfaces (overridden per theme below) */
+  --glass-bg: rgba(23, 31, 51, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-hover: rgba(255, 255, 255, 0.15);
+  --topbar-bg: rgba(11, 19, 38, 0.8);
+  --tile-bg: rgba(23, 31, 51, 0.4);
+  --input-surface: rgba(15, 23, 42, 0.4);
+  --panel-subtle: rgba(255, 255, 255, 0.01);
+  --panel-subtle-2: rgba(255, 255, 255, 0.02);
+  --divider-soft: rgba(255, 255, 255, 0.05);
+  --hover-soft: rgba(255, 255, 255, 0.05);
+  --btn-primary-border: rgba(255, 255, 255, 0.12);
+  --accent-active-bg: rgba(195, 192, 255, 0.15);
+  --accent-active-border: rgba(195, 192, 255, 0.3);
+  --toast-bg: rgba(23, 31, 51, 0.92);
+  --inset-bg: rgba(0, 0, 0, 0.2);
+  --progress-track: rgba(255, 255, 255, 0.1);
+  --shimmer-highlight: rgba(255, 255, 255, 0.15);
+  --select-arrow: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%23c3c0ff'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
 }
 
 @media (prefers-color-scheme: light) {
-  html.theme-system-sync {
+  html.theme-system-sync,
+  html.theme-light {
     --surface: #f8faff;
     --surface-dim: #d8ddf0;
     --surface-bright: #ffffff;
@@ -64,9 +85,81 @@
     
     --outline: #757780;
     --outline-variant: #c5c6d0;
+    /* Theme-aware component surfaces */
+    --glass-bg: rgba(255, 255, 255, 0.72);
+    --glass-border: rgba(19, 27, 46, 0.08);
+    --glass-border-hover: rgba(19, 27, 46, 0.18);
+    --topbar-bg: rgba(248, 250, 255, 0.85);
+    --tile-bg: rgba(255, 255, 255, 0.6);
+    --input-surface: rgba(19, 27, 46, 0.04);
+    --panel-subtle: rgba(19, 27, 46, 0.02);
+    --panel-subtle-2: rgba(19, 27, 46, 0.04);
+    --divider-soft: rgba(19, 27, 46, 0.08);
+    --hover-soft: rgba(19, 27, 46, 0.06);
+    --btn-primary-border: rgba(19, 27, 46, 0.1);
+    --accent-active-bg: rgba(79, 70, 229, 0.1);
+    --accent-active-border: rgba(79, 70, 229, 0.35);
+    --toast-bg: rgba(250, 251, 255, 0.95);
+    --inset-bg: rgba(19, 27, 46, 0.05);
+    --progress-track: rgba(19, 27, 46, 0.08);
+    --shimmer-highlight: rgba(19, 27, 46, 0.08);
+    --glow-primary: 0 0 15px rgba(79, 70, 229, 0.18);
+    --glow-primary-strong: 0 0 25px rgba(79, 70, 229, 0.32);
+    --select-arrow: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%234f46e5'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
   }
 }
 
+/* Explicit light theme — same palette as system-sync in light mode.
+ * Placed after the media query so an explicit choice always wins. */
+html.theme-light {
+  --surface: #f8faff;
+  --surface-dim: #d8ddf0;
+  --surface-bright: #ffffff;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f4f6fd;
+  --surface-container: #eef1f9;
+  --surface-container-high: #e8ebf4;
+  --surface-container-highest: #e2e6f0;
+
+  --on-surface: #191c24;
+  --on-surface-variant: #444751;
+
+  --primary: #4f46e5;
+  --primary-container: #e0e0ff;
+  --on-primary-container: #1000b0;
+
+  --secondary: #006a60;
+  --secondary-container: #7bf8e8;
+
+  --tertiary: #835500;
+
+  --error: #ba1a1a;
+  --error-container: #ffdad6;
+
+  --outline: #757780;
+  --outline-variant: #c5c6d0;
+  /* Theme-aware component surfaces */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(19, 27, 46, 0.08);
+  --glass-border-hover: rgba(19, 27, 46, 0.18);
+  --topbar-bg: rgba(248, 250, 255, 0.85);
+  --tile-bg: rgba(255, 255, 255, 0.6);
+  --input-surface: rgba(19, 27, 46, 0.04);
+  --panel-subtle: rgba(19, 27, 46, 0.02);
+  --panel-subtle-2: rgba(19, 27, 46, 0.04);
+  --divider-soft: rgba(19, 27, 46, 0.08);
+  --hover-soft: rgba(19, 27, 46, 0.06);
+  --btn-primary-border: rgba(19, 27, 46, 0.1);
+  --accent-active-bg: rgba(79, 70, 229, 0.1);
+  --accent-active-border: rgba(79, 70, 229, 0.35);
+  --toast-bg: rgba(250, 251, 255, 0.95);
+  --inset-bg: rgba(19, 27, 46, 0.05);
+  --progress-track: rgba(19, 27, 46, 0.08);
+  --shimmer-highlight: rgba(19, 27, 46, 0.08);
+  --glow-primary: 0 0 15px rgba(79, 70, 229, 0.18);
+  --glow-primary-strong: 0 0 25px rgba(79, 70, 229, 0.32);
+  --select-arrow: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%234f46e5'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+}
 :root {
   
   /* Typography */
@@ -204,10 +297,10 @@ code, .mono {
 
 /* Glassmorphism Panel */
 .glass-panel {
-  background: rgba(23, 31, 51, 0.65);
+  background: var(--glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
@@ -215,7 +308,7 @@ code, .mono {
 
 .glass-panel-hoverable:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: var(--glass-border-hover);
   box-shadow: var(--shadow-lg), var(--glow-primary);
 }
 
@@ -244,7 +337,7 @@ code, .mono {
   background-color: var(--primary-container);
   color: var(--on-primary-container);
   box-shadow: var(--shadow-sm);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--btn-primary-border);
 }
 
 .btn-primary:hover {
@@ -259,15 +352,15 @@ code, .mono {
 }
 
 .btn-ghost:hover {
-  background-color: rgba(255, 255, 255, 0.05);
+  background-color: var(--hover-soft);
   color: var(--on-surface);
   border-color: var(--outline);
 }
 
 .btn-ghost.active {
-  background-color: rgba(195, 192, 255, 0.15);
+  background-color: var(--accent-active-bg);
   color: var(--primary);
-  border-color: rgba(195, 192, 255, 0.3);
+  border-color: var(--accent-active-border);
 }
 
 .btn-icon {
@@ -314,7 +407,7 @@ select.select-dark {
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   /* Arrow drawn as inline SVG so it follows theme accent color. */
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%23c3c0ff'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-image: var(--select-arrow);
   background-repeat: no-repeat;
   background-position: right 12px center;
 }
@@ -382,9 +475,9 @@ select.select-dark option {
   height: 100%;
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.15) 50%,
-    rgba(255, 255, 255, 0) 100%
+    transparent 0%,
+    var(--shimmer-highlight) 50%,
+    transparent 100%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite linear;
@@ -460,7 +553,7 @@ select.select-dark option {
 
 input[type="checkbox"]:checked + .switch-control {
   background-color: var(--primary-container);
-  border-color: rgba(195, 192, 255, 0.3);
+  border-color: var(--accent-active-border);
 }
 
 input[type="checkbox"]:checked + .switch-control .switch-thumb {

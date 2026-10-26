@@ -27,8 +27,8 @@ export const PlatformButton: React.FC<PlatformButtonProps> = ({
         padding: '20px',
         gap: '12px',
         cursor: 'pointer',
-        border: '1px solid rgba(255, 255, 255, 0.08)',
-        background: 'rgba(23, 31, 51, 0.4)',
+        border: '1px solid var(--glass-border)',
+        background: 'var(--tile-bg)',
         width: '100%',
         height: '110px'
       }}

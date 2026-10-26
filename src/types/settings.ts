@@ -13,7 +13,8 @@ export interface AppSettings {
     createSubfolders: boolean;
   };
   general: {
-    theme: 'deep-space' | 'system-sync';
+    /** 'deep-space' dark, 'light' light, 'system-sync' follows the OS. */
+    theme: 'deep-space' | 'light' | 'system-sync';
     launchOnBoot: boolean;
     desktopNotifications: boolean;
     /** UI language — 'en' English, 'vi' Vietnamese. */

@@ -198,7 +198,7 @@ export const FinishedCard: React.FC<FinishedCardProps> = ({
           className="flex-row gap-sm"
           style={{
             marginTop: '8px',
-            borderTop: '1px solid rgba(255,255,255,0.05)',
+            borderTop: '1px solid var(--divider-soft)',
             paddingTop: '8px'
           }}
         >

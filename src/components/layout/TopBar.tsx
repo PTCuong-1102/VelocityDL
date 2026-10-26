@@ -30,7 +30,7 @@ export const TopBar: React.FC = () => {
       style={{
         height: 'var(--topbar-height)',
         borderBottom: '1px solid var(--outline-variant)',
-        backgroundColor: 'rgba(11, 19, 38, 0.8)',
+        backgroundColor: 'var(--topbar-bg)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
         alignItems: 'center',

@@ -71,7 +71,7 @@ const Toast: React.FC<ToastProps> = ({ item, onRemove }) => {
         padding: '12px 14px',
         borderRadius: '12px',
         border: `1px solid ${colors.border}`,
-        background: `rgba(23, 31, 51, 0.92) ${colors.bg}`,
+        background: `var(--toast-bg) ${colors.bg}`,
         backdropFilter: 'blur(16px)',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
         minWidth: '280px',

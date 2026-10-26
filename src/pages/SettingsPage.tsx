@@ -516,6 +516,13 @@ export const SettingsPage: React.FC = () => {
                   <button
                     className={`btn btn-ghost ${settings.general.theme === 'system-sync' ? 'active' : ''}`}
                     style={{ flexGrow: 1, padding: '8px 0', fontSize: '12px' }}
+                    onClick={() => updateSetting('general', 'theme', 'light')}
+                  >
+                    {t('settings.light')}
+                  </button>
+                  <button
+                    className={`btn btn-ghost ${settings.general.theme === 'system-sync' ? 'active' : ''}`}
+                    style={{ flexGrow: 1, padding: '8px 0', fontSize: '12px' }}
                     onClick={() => updateSetting('general', 'theme', 'system-sync')}
                   >
                     {t('settings.systemSync')}
@@ -661,7 +668,7 @@ export const SettingsPage: React.FC = () => {
                   <div style={{
                     width: '100%',
                     height: '6px',
-                    backgroundColor: 'rgba(255,255,255,0.1)',
+                    backgroundColor: 'var(--progress-track)',
                     borderRadius: '3px',
                     overflow: 'hidden'
                   }}>

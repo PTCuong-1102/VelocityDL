@@ -217,7 +217,7 @@ export const PlaylistCard: React.FC<PlaylistCardProps> = ({
                   gap: '12px',
                   padding: '6px 8px',
                   borderRadius: 'var(--radius-sm)',
-                  backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                  backgroundColor: 'var(--panel-subtle-2)',
                   fontSize: '12px'
                 }}
               >

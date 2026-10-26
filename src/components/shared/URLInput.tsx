@@ -248,7 +248,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
               onDrop={handleDrop}
               style={{
                 alignItems: 'center',
-                backgroundColor: isDragging ? 'rgba(79, 70, 229, 0.15)' : 'rgba(15, 23, 42, 0.4)',
+                backgroundColor: isDragging ? 'rgba(79, 70, 229, 0.15)' : 'var(--input-surface)',
                 borderRadius: 'var(--radius-lg)',
                 padding: '8px',
                 border: isDragging ? '2px dashed var(--primary)' : '1px solid var(--outline-variant)',
@@ -335,7 +335,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   }
                 }}
                 style={{
-                  backgroundColor: isDragging ? 'rgba(79, 70, 229, 0.15)' : 'rgba(15, 23, 42, 0.4)',
+                  backgroundColor: isDragging ? 'rgba(79, 70, 229, 0.15)' : 'var(--input-surface)',
                   borderRadius: 'var(--radius-lg)',
                   padding: '12px',
                   border: isDragging ? '2px dashed var(--primary)' : '1px solid var(--outline-variant)',
@@ -433,7 +433,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                 className="flex-col gap-lg"
                 style={{
                   padding: '16px 20px',
-                  backgroundColor: 'rgba(255,255,255,0.01)',
+                  backgroundColor: 'var(--panel-subtle)',
                   borderRadius: 'var(--radius-lg)',
                   border: '1px solid var(--outline-variant)',
                   marginTop: '4px'
@@ -558,7 +558,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
                   <div 
                     className="flex-col gap-sm"
                     style={{
-                      backgroundColor: 'rgba(255,255,255,0.02)',
+                      backgroundColor: 'var(--panel-subtle-2)',
                       borderRadius: 'var(--radius-md)',
                       padding: '12px 16px',
                       border: '1px solid var(--outline-variant)'
@@ -1024,7 +1024,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
               <div 
                 className="flex-col gap-sm"
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.02)',
+                  backgroundColor: 'var(--panel-subtle-2)',
                   borderRadius: 'var(--radius-md)',
                   padding: '16px',
                   border: '1px solid var(--outline-variant)'
@@ -1082,7 +1082,7 @@ export const URLInput: React.FC<URLInputProps> = ({ onDownload }) => {
               analyzedInfo?.platform === 'youtube' && (
                 <div 
                   style={{
-                    backgroundColor: 'rgba(255,255,255,0.02)',
+                    backgroundColor: 'var(--panel-subtle-2)',
                     borderRadius: 'var(--radius-md)',
                     padding: '12px 16px',
                     border: '1px solid var(--outline-variant)'
