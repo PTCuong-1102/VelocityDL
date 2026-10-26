@@ -295,6 +295,45 @@ code, .mono {
   box-shadow: var(--glow-primary);
 }
 
+/* Native <select> styled for the dark theme. Without `appearance: none`
+ * WebKitGTK draws its own light button face from the GTK theme while our
+ * `color: var(--on-surface)` (light) still applies to the text — light
+ * text on a light face, unreadable. Disabling native appearance and
+ * drawing our own arrow keeps text and background both on-theme. */
+select.select-dark {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--surface-container-lowest);
+  color: var(--on-surface);
+  border: 1px solid var(--outline-variant);
+  border-radius: var(--radius-md);
+  padding: 8px 34px 8px 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  /* Arrow drawn as inline SVG so it follows theme accent color. */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='%23c3c0ff'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+select.select-dark:hover {
+  border-color: var(--outline);
+}
+
+select.select-dark:focus {
+  border-color: var(--primary);
+  box-shadow: var(--glow-primary);
+}
+
+/* Dropdown list items also render with GTK light styling otherwise. */
+select.select-dark option {
+  background-color: var(--surface-container);
+  color: var(--on-surface);
+}
+
 .input-dark.mono {
   font-family: var(--font-mono);
   font-size: 13px;

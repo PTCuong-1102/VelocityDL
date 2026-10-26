@@ -299,18 +299,8 @@ export const SettingsPage: React.FC = () => {
                   <span className="text-muted" style={{ fontSize: '11px' }}>Restrict maximum download bandwidth usage.</span>
                 </div>
                 <select
-                  style={{
-                    backgroundColor: 'var(--surface-container-lowest)',
-                    border: '1px solid var(--outline-variant)',
-                    borderRadius: 'var(--radius-md)',
-                    color: 'var(--on-surface)',
-                    padding: '8px 12px',
-                    outline: 'none',
-                    fontSize: '13px',
-                    height: '38px',
-                    cursor: 'pointer',
-                    width: '150px'
-                  }}
+                  className="select-dark"
+                  style={{ width: '150px' }}
                   value={settings.engine.speedLimit || 0}
                   onChange={(e) => updateSetting('engine', 'speedLimit', Number(e.target.value))}
                 >
@@ -332,17 +322,7 @@ export const SettingsPage: React.FC = () => {
                 <span style={{ fontWeight: 500, fontSize: '13px' }}>Network Proxy Settings</span>
                 <div className="flex-row gap-sm">
                   <select
-                    style={{
-                      backgroundColor: 'var(--surface-container-lowest)',
-                      border: '1px solid var(--outline-variant)',
-                      borderRadius: 'var(--radius-md)',
-                      color: 'var(--on-surface)',
-                      padding: '8px 12px',
-                      outline: 'none',
-                      fontSize: '13px',
-                      height: '38px',
-                      cursor: 'pointer'
-                    }}
+                    className="select-dark"
                     value={settings.engine.proxyType}
                     onChange={(e) => updateSetting('engine', 'proxyType', e.target.value as any)}
                   >
@@ -365,18 +345,8 @@ export const SettingsPage: React.FC = () => {
                 <span style={{ fontWeight: 500, fontSize: '13px' }}>Cookie Authentication (Stories &amp; Login-gated Content)</span>
                 <div className="flex-row gap-sm">
                   <select
-                    style={{
-                      backgroundColor: 'var(--surface-container-lowest)',
-                      border: '1px solid var(--outline-variant)',
-                      borderRadius: 'var(--radius-md)',
-                      color: 'var(--on-surface)',
-                      padding: '8px 12px',
-                      outline: 'none',
-                      fontSize: '13px',
-                      height: '38px',
-                      cursor: 'pointer',
-                      flexGrow: 1
-                    }}
+                    className="select-dark"
+                    style={{ flexGrow: 1, height: '38px' }}
                     value={settings.engine.cookieSource}
                     onChange={(e) => {
                       const v = e.target.value as any;
